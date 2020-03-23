@@ -6,15 +6,20 @@
 # python ../../tools/demo.py --resume SiamMask_DAVIS.pth --config config_davis.json --base_path /data/Ponc/tracking/JPEGImages/480p/nhl/
 # --------------------------------------------------------
 import glob
-import pickle 
-from tools.test import *
+import numpy as np
+import cv2
+import pickle
+import torch
+import argparse
+from tools.test_2_nostre import *
 from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
 from shapely.geometry import Polygon
 from shapely.geometry import asPolygon
+
 parser = argparse.ArgumentParser(description='PyTorch Tracking Demo')
 
 parser.add_argument('--resume', default='', type=str, required=True,
-                    metavar='PATH',help='path to latest checkpoint (default: none)')
+                    metavar='PATH', help='path to latest checkpoint (default: none)')
 parser.add_argument('--config', dest='config', default='config_davis.json',
                     help='hyper-parameter of SiamMask in json format')
 parser.add_argument('--base_path', default='../../data/balls', help='datasets')
@@ -59,7 +64,7 @@ def filter_bboxes(rboxes, k, c=10):
         del rboxes[-1]
         num_bxs = len(rboxes)
 
-    polygons = np.zeros((num_bxs, 4, 2)) # (num_bxs, 8 (points of a polygon, 2 (coordinates of each point)))
+    polygons = np.zeros((num_bxs, 4, 2))  # (num_bxs, 8 (points of a polygon, 2 (coordinates of each point)))
     scores = np.zeros(num_bxs)
 
     for i, (box, score) in enumerate(rboxes):
@@ -113,19 +118,16 @@ if __name__ == '__main__':
     siammask.eval().to(device)
     
     # Parse Image file
-    img_files = sorted(glob.glob(join(args.base_path, '*.jp*')))[32:88]
+    #TODO: Canviar frames
+    img_files = sorted(glob.glob(join(args.base_path, '*.jp*')))[000:300]
     
     ims = [cv2.imread(imf) for imf in img_files]
     
     try:
         # init_rect = cv2.selectROI('SiamMask', ims[0], False, False)
-        init_rect = (737,165, 76, 76) # balls noia
-        init_rect = (75,388, 200, 79) # Seagull
-        # init_rect = (536,105, 41, 40) # juggling-easy
-        init_rect = (437, 306, 115,50) # Eagles
-        init_rect = (737, 374, 100, 156) # NHL
-        init_rect = (1027, 259, 57, 100) # NFL
-
+        # TODO: Posar bbox inicial
+        # init_rect = (433, 250, 53, 136)  # Irene
+        init_rect = (107, 445, 62, 100)  # ants1
         x, y, w, h = init_rect
 
     except:
@@ -173,7 +175,7 @@ if __name__ == '__main__':
             location = state['ploygon'].flatten()
             mask = state['mask'] > state['p'].seg_thr
             im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
-            laloc = np.int0(location).reshape((-1,1,2))
+            laloc = np.int0(location).reshape((-1, 1, 2))
             traj = np.int0(np.average(laloc, axis=0)[0])
             frame_boxes.append([traj])
             for i in range(laloc.shape[0]):
@@ -181,12 +183,16 @@ if __name__ == '__main__':
                 cv2.circle(im, (traj[0], traj[1]) , 3, (255,255,0), 2)
             
             cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, (0, 255, 0), 3)
-            cv2.putText(im,str(state['score']),(50,50),cv2.FONT_HERSHEY_COMPLEX,1.0,(0,255,0))
-            cv2.imwrite('/data/Ponc/tracking/results/crossing_football_superbowl_2020_debug/'+str(f)+'.jpeg', im)
+            cv2.putText(im, str(state['score']), (50, 50), cv2.FONT_HERSHEY_COMPLEX, 1.0, (0, 255, 0))
+
+            # TODO: Omplir amb el video que s'esta tractant
+            # Save results
+            cv2.imwrite('/data/Marina/ants1/results/'+str(f)+'.jpeg', im)
             all_bboxes.append(frame_boxes)
         toc += cv2.getTickCount() - tic
-    
-    with open('/data/Ponc/tracking/centroids_tree_nfl.obj','wb') as fil:
+
+    #TODO: canviar nom
+    with open('/data/Marina/ants1/points/centroids_ants1.obj', 'wb') as fil:
         pickle.dump(all_bboxes, fil)
     
     toc /= cv2.getTickFrequency()

@@ -17,8 +17,9 @@ s = int(np.ceil(W/2)-1)
 coordinate = 0  # coordinate 0: x, 1: y
 
 # Tracker data
-directory = '/data/Ponc/tracking/centroids_tree_nhl.obj'
+# directory = '/data/Ponc/tracking/centroids_tree_nhl.obj'
 # directory = '/Users/marinaalonsopoal/Desktop/centroids_tree_nhl.obj'
+directory = '/data/Marina/ants1/points/centroids_ants1.obj'
 
 with open(directory, 'rb') as f:
     data = pkl.load(f)
@@ -66,6 +67,6 @@ jblds = np.asarray(tracker.JBLDs_x)
 
 # Visualization
 # plot_data_and_smoothed(data, list_smoothed, W)
-# plot_candidates_and_trajectory(data, list_smoothed, points_tracked_npy, T0, T, W, coordinate)
-plot_candidates_and_jblds(coordinate, data, points_tracked_npy, jblds, T0, T)
-plot_position_and_bboxes(data, bboxes)
+plot_candidates_and_trajectory(data, list_smoothed, points_tracked_npy, T0, T, W, coordinate)
+# plot_candidates_and_jblds(coordinate, data, points_tracked_npy, jblds, T0, T)
+# plot_position_and_bboxes(data, bboxes)
