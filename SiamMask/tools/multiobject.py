@@ -20,7 +20,13 @@ args = parser.parse_args()
 # PARAMETERS
 colors = ['red', 'yellow', 'green', 'blue', 'orange', 'purple']
 colors = [(0, 255, 0), (0, 0, 255), (255, 0, 0), (255, 255, 0), (255, 0, 255), (0, 255, 255)]
-drawMask = False
+drawMask = True
+drawCandidates = True
+font = cv2.FONT_HERSHEY_SIMPLEX
+font_size = 1
+title = 'Dataset: VOT2018 ' \
+        'Sequence: ants1'
+
 
 def compute_intersection_by_pairs(polygons, sorted_scores, intersection_th=0.5):
     "Computes "
@@ -74,7 +80,7 @@ def filter_bboxes(rboxes, k, c=10):
 
     xmax, xmin = centroids_x[-1], centroids_x[0]
     ymax, ymin = centroids_y[-1], centroids_y[0]
-    intersection_th = 0.9  # If 2 boxes overlap more than 0.4 the one with max score will remain
+    intersection_th = 0.7  # If 2 boxes overlap more than 0.4 the one with max score will remain
 
     if ((xmax - xmin) >= (ymax - ymin)):
         # Make pairs according to x axis (indexes_x)
@@ -121,7 +127,8 @@ if __name__ == '__main__':
     im_ori = ims[0]  # First frame
 
     # TODO: Write initial bboxes
-    init_rects = [(107, 445, 62, 100), (236, 211, 104, 67), (187, 621, 88, 60) ]  # ants1 (ant1, ant2 and ant3)
+    init_rects = [(107, 445, 62, 100), (236, 211, 104, 67), (187, 621, 88, 60),
+                  (225, 561, 90, 67), (166, 444, 83, 58), (233, 455, 60, 93)]
     n_obj = len(init_rects)  # Number of objects being tracked
     target_pos = np.zeros((n_obj, 2))  # Targets centroids in the first frame
     target_sz = np.zeros((n_obj, 2))  # Targets height and width
@@ -131,9 +138,12 @@ if __name__ == '__main__':
         target_pos[i, :] = np.array([x + w / 2, y + h / 2])
         target_sz[i, :] = np.array([w, h])
 
-    all_centroids = {}
+    all_centroids = {}  # Dict that will save all the objects trajectories and discarded candidates
 
     for f, im in enumerate(ims):
+        print('Frame: ', f)
+        cv2.putText(im, title, (10, 30), font, font_size, (0, 0, 0), 2, cv2.LINE_AA)
+        cv2.putText(im, 'Frame: ' + str(f), (10, 60), font, font_size*0.75, (0, 0, 0), 2, cv2.LINE_AA)
         tic = cv2.getTickCount()
 
         if f == 0:  # Initialize tracker
@@ -144,7 +154,7 @@ if __name__ == '__main__':
                 state = siamese_init(im_ori, target_pos[i, :], target_sz[i, :], siammask, cfg['hp'], device=device)  # init tracker
                 list_states.append(state)
 
-        elif f > 0:  # tracking
+        elif f > 0:  # Perform tracking
             for i in range(n_obj):
                 dict_key = 'object' + str(i)  # object1, object2, ...
                 frame_boxes = []
@@ -154,21 +164,23 @@ if __name__ == '__main__':
                                                        device=device)  # track
                 list_states[i] = state
 
-                rboxes = filter_bboxes(rboxes, 1, c=10 * len(rboxes))  # Return c bounding boxes
+                rboxes = filter_bboxes(rboxes, 50, c=10 * len(rboxes))  # Return c bounding boxes
                 # dibuixar nomes la bbox filtrada si esta fora de la bona (state)
                 locaux_bona = np.int0(state['ploygon'].flatten()).reshape((-1, 2))
                 locaux_filt = rboxes[0][0]
                 pol_a = asPolygon(locaux_bona)
                 pol_b = asPolygon(locaux_filt)
                 intersection_area = pol_a.intersection(pol_b)
-                if ((intersection_area.area / (pol_a.area + pol_b.area)) <= 0.2):
-                    for i in range(len(rboxes)):
-                        location = rboxes[i][0].flatten()
+                if ((intersection_area.area / (pol_a.area + pol_b.area)) <= 0.5):
+                    for j in range(len(rboxes)):
+                        location = rboxes[j][0].flatten()
                         location = np.int0(location).reshape((-1, 1, 2))
-                        cv2.polylines(im, [location], True, (255, 255, 0), 1)
                         traj = np.average(location, axis=0)[0]
                         frame_boxes.append([traj])
-                        cv2.circle(im, (int(traj[0]), int(traj[1])), 3, (255, 255, 0), 2)
+                        # Draw discarded candidates centroids
+                        if drawCandidates:
+                            cv2.polylines(im, [location], True, colors[i], 1)
+                            cv2.circle(im, (int(traj[0]), int(traj[1])), 1, colors[i], -1)
 
                 location = state['ploygon'].flatten()
                 if drawMask:
@@ -180,7 +192,7 @@ if __name__ == '__main__':
                 frame_boxes.append([traj])
                 all_centroids[dict_key].append(frame_boxes)
 
-                cv2.circle(im, (traj[0], traj[1]), 3, colors[i], 2)
+                cv2.circle(im, (traj[0], traj[1]), 3, colors[i], -1)
                 cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, colors[i], 3)
                 # cv2.putText(im, str(state['score']), (50, 50), cv2.FONT_HERSHEY_COMPLEX, 1.0, (0, 255, 0))
 
@@ -188,7 +200,7 @@ if __name__ == '__main__':
             # Save results
             cv2.imwrite('/data/Marina/ants1/results/' + str(f) + '.jpeg', im)
 
-            # TODO: tracking
+            # TODO: tracking EN REALITAT FERHO MES AMUNT< ABANS DE DIBUIXAR
             # (x,y) = tracker.decide(points) on points es una llista de candidats
         toc += cv2.getTickCount() - tic
 
