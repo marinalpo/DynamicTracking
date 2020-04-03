@@ -26,6 +26,7 @@ from utils.tracker_config import TrackerConfig
 
 from utils.config_helper import load_config
 from utils.pyvotkit.region import vot_overlap, vot_float2str
+from shapely.geometry import asPolygon
 
 
 thrs = np.arange(0.3, 0.5, 0.05)
@@ -119,6 +120,74 @@ def get_subwindow_tracking(im, pos, model_sz, original_sz, avg_chans, out_mode='
     arrendatario+=1
     return im_to_torch(im_patch) if out_mode in 'torch' else im_patch
 
+def compute_intersection_by_pairs(polygons, sorted_scores, intersection_th=0.5):
+    "Computes "
+    results = []
+    for i in range(polygons.shape[0] // 2):
+        pol_a = asPolygon(polygons[i, :, :])
+        pol_b = asPolygon(polygons[i + 1, :, :])
+        intersection_area = pol_a.intersection(pol_b)
+        iou = intersection_area.area / (pol_a.area + pol_b.area)
+        if iou >= intersection_th:
+            if (sorted_scores[i] >= sorted_scores[i + 1]):
+                results.append([polygons[i, :, :], sorted_scores[i]])
+            else:
+                results.append([polygons[i + 1, :, :], sorted_scores[i]])
+        else:
+            if (sorted_scores[i] >= sorted_scores[i + 1]):
+                results.append([polygons[i, :, :], sorted_scores[i]])
+            else:
+                results.append([polygons[i + 1, :, :], sorted_scores[i]])
+    return results
+
+
+def filter_bboxes(rboxes, k, c=10):
+    """
+    rboxes: list, contains: [(np.array(polygon), score),(), ... , ()]
+    """
+    num_bxs = len(rboxes)
+    if c == 0:  # Evita bucle infinit
+        return rboxes
+    if num_bxs <= 1:
+        return rboxes
+    if num_bxs % 2 != 0:
+        # We compare by pairs so we need an odd number of boxes
+        del rboxes[-1]
+        num_bxs = len(rboxes)
+
+    polygons = np.zeros((num_bxs, 4, 2))  # (num_bxs, 8 (points of a polygon, 2 (coordinates of each point)))
+    scores = np.zeros(num_bxs)
+    for i, (box, score) in enumerate(rboxes):
+        box_mat = box.reshape(4, 2)
+        polygons[i, :, :] = box_mat
+        scores[i] = score
+    # Compute centroids
+    centroids = np.mean(polygons, axis=1)
+    indexes_x = np.argsort(centroids[:, 0])  # Ascending order
+    indexes_y = np.argsort(centroids[:, 1])
+    centroids_x = centroids[indexes_x, 0]
+    centroids_y = centroids[indexes_y, 1]
+
+    xmax, xmin = centroids_x[-1], centroids_x[0]
+    ymax, ymin = centroids_y[-1], centroids_y[0]
+    intersection_th = 0.7  # If 2 boxes overlap more than 0.4 the one with max score will remain
+
+    if ((xmax - xmin) >= (ymax - ymin)):
+        # Make pairs according to x axis (indexes_x)
+        polygons = polygons[indexes_x]
+        sorted_scores = scores[indexes_x]
+        rboxes = compute_intersection_by_pairs(polygons, sorted_scores)
+    else:
+        # Make pairs according to y axis (indexes_y)
+        polygons = polygons[indexes_y]
+        sorted_scores = scores[indexes_y]
+        rboxes = compute_intersection_by_pairs(polygons, sorted_scores)
+
+    if (len(rboxes) != 1 and len(rboxes) > k):
+        c -= 1
+        rboxes = filter_bboxes(rboxes, k, c)
+
+    return rboxes
 
 def generate_anchor(cfg, score_size):
     anchors = Anchors(cfg)
@@ -202,7 +271,7 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
     window = state['window']
     target_pos = state['target_pos']
     target_sz = state['target_sz']
-    print(im.shape)
+    # print(im.shape)
     wc_x = target_sz[1] + p.context_amount * sum(target_sz)
     hc_x = target_sz[0] + p.context_amount * sum(target_sz)
     s_x = np.sqrt(wc_x * hc_x)
@@ -310,7 +379,7 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
             delta_x, delta_y = best_pscore_id_mask[2], best_pscore_id_mask[1] # delta_x and delta_y are the selected coordinates in the volume
             
             if((delta_x, delta_y) not in deltas):
-                print("delta: (", delta_x, ", ", delta_y, ")")
+                # print("delta: (", delta_x, ", ", delta_y, ")")
                 deltas.append((delta_x,delta_y))
                 if refine_enable:
                     mask = net.track_refine((delta_y, delta_x)).to(device).sigmoid().squeeze().view(
