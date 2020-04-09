@@ -1,7 +1,6 @@
 import numpy as np
 import cv2
 import os
-from utils_visualization import create_colormap_hsv
 
 
 def get_location(gt):

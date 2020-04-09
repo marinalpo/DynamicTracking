@@ -74,6 +74,15 @@ def get_axis_aligned_bbox(region):
     return cx, cy, w, h
 
 
+def get_aligned_bbox(location):
+    l = location.reshape(4, 2)
+    x = np.min(l[:, 0])
+    y = np.min(l[:, 1])
+    w = np.max(l[:, 0]) - x
+    h = np.max(l[:, 1]) - y
+    return x, y, w, h
+
+
 def aug_apply(bbox, param, shape, inv=False, rd=False):
     """
     apply augmentation

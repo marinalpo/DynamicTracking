@@ -119,7 +119,7 @@ if __name__ == '__main__':
     
     # Parse Image file
     #TODO: Canviar frames
-    img_files = sorted(glob.glob(join(args.base_path, '*.jp*')))[000:300]
+    img_files = sorted(glob.glob(join(args.base_path, '*.jp*')))[000:20]
     
     ims = [cv2.imread(imf) for imf in img_files]
     
@@ -128,6 +128,7 @@ if __name__ == '__main__':
         # TODO: Posar bbox inicial
         # init_rect = (433, 250, 53, 136)  # Irene
         init_rect = (107, 445, 62, 100)  # ants1
+        init_rect = (912, 457, 89, 101)  # ants1
         x, y, w, h = init_rect
 
     except:
@@ -145,6 +146,7 @@ if __name__ == '__main__':
             target_pos = np.array([x + w / 2, y + h / 2])
             target_sz = np.array([w, h])
             state = siamese_init(im, target_pos, target_sz, siammask, cfg['hp'], device=device)  # init tracker
+            cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (0, 255, 0), 5)
         elif f > 0:  # tracking
             # state = siamese_init(im, target_pos, target_sz, siammask, cfg['hp'], device=device)
             state, bboxes, rboxes = siamese_track(state, im, mask_enable=True, refine_enable=True, device=device)  # track
@@ -173,8 +175,8 @@ if __name__ == '__main__':
                     cv2.circle(im, (int(traj[0]), int(traj[1])) , 3, (255,255,0), 2)
                
             location = state['ploygon'].flatten()
-            mask = state['mask'] > state['p'].seg_thr
-            im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
+            # mask = state['mask'] > state['p'].seg_thr
+            # im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
             laloc = np.int0(location).reshape((-1, 1, 2))
             traj = np.int0(np.average(laloc, axis=0)[0])
             frame_boxes.append([traj])
@@ -187,8 +189,9 @@ if __name__ == '__main__':
 
             # TODO: Omplir amb el video que s'esta tractant
             # Save results
-            cv2.imwrite('/data/Marina/ants1/results/'+str(f)+'.jpeg', im)
+
             all_bboxes.append(frame_boxes)
+        cv2.imwrite('/data/results3/' + str(f) + '.jpeg', im)
         toc += cv2.getTickCount() - tic
 
     #TODO: canviar nom
