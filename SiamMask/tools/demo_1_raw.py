@@ -6,7 +6,7 @@
 # --------------------------------------------------------
 import glob
 import pickle 
-from tools.test_raw import *
+from tools.test_1_raw import *
 from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
 from shapely.geometry import Polygon
 from shapely.geometry import asPolygon
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     
     # Parse Image file
     # img_files = sorted(glob.glob(join(args.base_path, '*.jp*')))[772:805] # NHL
-    img_files = sorted(glob.glob(join(args.base_path, '*.jp*')))[32:88] # NFL
+    img_files = sorted(glob.glob(join(args.base_path, '*.jp*')))[00:20] # NFL
     
     ims = [cv2.imread(imf) for imf in img_files]
     
@@ -51,6 +51,7 @@ if __name__ == '__main__':
         init_rect = (437, 306, 115,50) # Eagles
         init_rect = (737, 374, 100, 156) # NHL
         init_rect = (1027, 259, 57, 100) # NFL
+        init_rect = (912, 457, 89, 101)  # ACROBATS
         x, y, w, h = init_rect
 
     except:
@@ -67,6 +68,7 @@ if __name__ == '__main__':
             target_pos = np.array([x + w / 2, y + h / 2])
             target_sz = np.array([w, h])
             state = siamese_init(im, target_pos, target_sz, siammask, cfg['hp'], device=device)  # init tracker
+            cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (0, 255, 0), 5)
         elif f > 0:  # tracking
             # state = siamese_init(im, target_pos, target_sz, siammask, cfg['hp'], device=device)
             state = siamese_track(state, im, mask_enable=True, refine_enable=True, device=device)  # track
@@ -83,7 +85,7 @@ if __name__ == '__main__':
             
             cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, (0, 255, 0), 3)
             cv2.putText(im,str(state['score']),(50,50),cv2.FONT_HERSHEY_COMPLEX,1.0,(0,255,0))
-            cv2.imwrite('/data/Ponc/tracking/results/crossing_football_superbowl_2020/'+str(f)+'.jpeg', im)
+            cv2.imwrite('/data/results3/' + str(f) + '.jpeg', im)
 
         toc += cv2.getTickCount() - tic
 

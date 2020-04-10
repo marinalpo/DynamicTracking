@@ -28,11 +28,10 @@ from utils.config_helper import load_config
 from utils.pyvotkit.region import vot_overlap, vot_float2str
 from shapely.geometry import asPolygon
 
-
 thrs = np.arange(0.3, 0.5, 0.05)
 
 parser = argparse.ArgumentParser(description='Test SiamMask')
-parser.add_argument('--arch', dest='arch', default='', choices=['Custom',],
+parser.add_argument('--arch', dest='arch', default='', choices=['Custom', ],
                     help='architecture of pretrained model')
 parser.add_argument('--config', dest='config', required=True, help='hyper-parameter for SiamMask')
 parser.add_argument('--resume', default='', type=str, required=True,
@@ -65,7 +64,10 @@ def im_to_torch(img):
     img = to_torch(img).float()
     return img
 
+
 arrendatario = 0
+
+
 def get_subwindow_tracking(im, pos, model_sz, original_sz, avg_chans, out_mode='torch'):
     global arrendatario
     # print("       ------get_subwindow_tracking------")
@@ -114,11 +116,12 @@ def get_subwindow_tracking(im, pos, model_sz, original_sz, avg_chans, out_mode='
         im_patch = cv2.resize(im_patch_original, (model_sz, model_sz))
     else:
         im_patch = im_patch_original
-    #cv2.imshow('crop', im_patch)
+    # cv2.imshow('crop', im_patch)
     # cv2.imwrite('/data/Ponc/tracking/results/windows-seagulls-debug/im_patch_'+str(arrendatario)+'.jpeg', im_patch)
-    #cv2.waitKey(0)
-    arrendatario+=1
+    # cv2.waitKey(0)
+    arrendatario += 1
     return im_to_torch(im_patch) if out_mode in 'torch' else im_patch
+
 
 def compute_intersection_by_pairs(polygons, sorted_scores, intersection_th=0.5):
     "Computes "
@@ -189,12 +192,13 @@ def filter_bboxes(rboxes, k, c=10):
 
     return rboxes
 
+
 def generate_anchor(cfg, score_size):
     anchors = Anchors(cfg)
     anchor = anchors.anchors
-    
+
     x1, y1, x2, y2 = anchor[:, 0], anchor[:, 1], anchor[:, 2], anchor[:, 3]
-    anchor = np.stack([(x1+x2)*0.5, (y1+y2)*0.5, x2-x1, y2-y1], 1)
+    anchor = np.stack([(x1 + x2) * 0.5, (y1 + y2) * 0.5, x2 - x1, y2 - y1], 1)
 
     total_stride = anchors.stride
     anchor_num = anchor.shape[0]
@@ -224,7 +228,7 @@ def siamese_init(im, target_pos, target_sz, model, hp=None, device='cpu'):
     p.scales = model.anchors['scales']
     p.ratios = model.anchors['ratios']
     p.anchor_num = model.anchor_num
-    
+
     p.anchor = generate_anchor(model.anchors, p.score_size)
     avg_chans = np.mean(im, axis=(0, 1))
 
@@ -237,7 +241,7 @@ def siamese_init(im, target_pos, target_sz, model, hp=None, device='cpu'):
     z = Variable(z_crop.unsqueeze(0))
     # La xarxa es guarda les features resultants (self.zf) d'haver passat el patch z per la siamesa
     net.template(z.to(device))
-    
+
     if p.windowing == 'cosine':
         window = np.outer(np.hanning(p.score_size), np.hanning(p.score_size))
     elif p.windowing == 'uniform':
@@ -254,15 +258,6 @@ def siamese_init(im, target_pos, target_sz, model, hp=None, device='cpu'):
     return state
 
 
-
-
-
-
-
-
-
-
-
 def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu', debug=False):
     global arrendatario
     p = state['p']
@@ -276,12 +271,12 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
     hc_x = target_sz[0] + p.context_amount * sum(target_sz)
     s_x = np.sqrt(wc_x * hc_x)
     scale_x = p.exemplar_size / s_x  # p.exemplar_size = 127, sempre es la mateixa
-    d_search = (p.instance_size - p.exemplar_size) / 2 
+    d_search = (p.instance_size - p.exemplar_size) / 2
     pad = d_search / scale_x
     s_x = s_x + 2 * pad
     crop_box = [target_pos[0] - round(s_x) / 2, target_pos[1] - round(s_x) / 2, round(s_x), round(s_x)]
 
-    debug=True
+    debug = True
     if debug:
         im_debug = im.copy()
         crop_box_int = np.int0(crop_box)
@@ -294,21 +289,22 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
     x_crop = Variable(get_subwindow_tracking(im, target_pos, p.instance_size, round(s_x), avg_chans).unsqueeze(0))
     # In davis we have 5 anchors
     if mask_enable:
-        score, delta, mask = net.track_mask(x_crop.to(device)) # score: (1,10,25,25), delta: (1, 20 (5boxes*4coords), 25, 25), mask: (1, 63*63, 25, 25)
+        score, delta, mask = net.track_mask(
+            x_crop.to(device))  # score: (1,10,25,25), delta: (1, 20 (5boxes*4coords), 25, 25), mask: (1, 63*63, 25, 25)
     else:
-        score, delta = net.track(x_crop.to(device)) 
-    
+        score, delta = net.track(x_crop.to(device))
+
     delta = delta.permute(1, 2, 3, 0).contiguous().view(4, -1).data.cpu().numpy()
 
     # Softmax in 3125,2,which each column is BG, FG
     score = F.softmax(score.permute(1, 2, 3, 0).contiguous().view(2, -1).permute(1, 0), dim=1).data[:,
             1].cpu().numpy()
-     
+
     delta[0, :] = delta[0, :] * p.anchor[:, 2] + p.anchor[:, 0]
     delta[1, :] = delta[1, :] * p.anchor[:, 3] + p.anchor[:, 1]
     delta[2, :] = np.exp(delta[2, :]) * p.anchor[:, 2]
     delta[3, :] = np.exp(delta[3, :]) * p.anchor[:, 3]
-    
+
     def change(r):
         return np.maximum(r, 1. / r)
 
@@ -321,9 +317,9 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
         pad = (wh[0] + wh[1]) * 0.5
         sz2 = (wh[0] + pad) * (wh[1] + pad)
         return np.sqrt(sz2)
-        
+
     # size penalty
-    target_sz_in_crop = target_sz*scale_x
+    target_sz_in_crop = target_sz * scale_x
     s_c = change(sz(delta[2, :], delta[3, :]) / (sz_wh(target_sz_in_crop)))  # scale penalty
     r_c = change((target_sz_in_crop[0] / target_sz_in_crop[1]) / (delta[2, :] / delta[3, :]))  # ratio penalty
 
@@ -332,55 +328,56 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
 
     # cos window (motion model)
     N = 17
-    bboxes = np.zeros((6,N), dtype=np.float64) 
+    bboxes = np.zeros((6, N), dtype=np.float64)
     # bboxes has the shape (6 , Npoints) ; 0=res_x, 1=res_y, 2=res_w, 3=res_h, 4=score, 5=best_pscore_id_tmp
     pscore = pscore * (1 - p.window_influence) + window * p.window_influence
-    attmap = score.reshape(5,25,25)
+    attmap = score.reshape(5, 25, 25)
     attmap = np.amax(attmap, axis=0)
     # np.save('/data/Ponc/tracking/results/mevasa/'+str(arrendatario)+'.npy', attmap)
     best_score_threshold = 0.99
-    for idx in range(0,N):
-        if(idx==0):
+    for idx in range(0, N):
+        if (idx == 0):
             best_pscore_id = np.argmax(pscore)
-            
+
         best_pscore_id_tmp = np.argmax(pscore)
         pred_in_crop = delta[:, best_pscore_id_tmp] / scale_x
-    
+
         lr = penalty[best_pscore_id_tmp] * score[best_pscore_id_tmp] * p.lr  # lr for OTB
 
         res_x = pred_in_crop[0] + target_pos[0]
         res_y = pred_in_crop[1] + target_pos[1]
         res_w = target_sz[0] * (1 - lr) + pred_in_crop[2] * lr
         res_h = target_sz[1] * (1 - lr) + pred_in_crop[3] * lr
-        
+
         target_pos = np.array([res_x, res_y])
         target_sz = np.array([res_w, res_h])
-    
+
         bboxes[0, idx] = target_pos[0]
         bboxes[1, idx] = target_pos[1]
         bboxes[2, idx] = target_sz[0]
         bboxes[3, idx] = target_sz[1]
-        bboxes[4, idx] = pscore[best_pscore_id_tmp] #BUG: This should be pscore[best_...]?
+        bboxes[4, idx] = pscore[best_pscore_id_tmp]  # BUG: This should be pscore[best_...]?
         bboxes[5, idx] = best_pscore_id_tmp
-        if(pscore[best_pscore_id]>best_score_threshold):
+        if (pscore[best_pscore_id] > best_score_threshold):
             break
         pscore[best_pscore_id_tmp] = 0.0
-        
-    target_pos = np.array([bboxes[0,0],bboxes[1,0]])
-    target_sz = np.array([bboxes[2,0], bboxes[3,0]])
+
+    target_pos = np.array([bboxes[0, 0], bboxes[1, 0]])
+    target_sz = np.array([bboxes[2, 0], bboxes[3, 0]])
 
     # for Mask Branch
     rboxes = []
     deltas = []
 
-    for idx in range(0,N):
+    for idx in range(0, N):
         if mask_enable:
             best_pscore_id_mask = np.unravel_index(int(bboxes[5, idx]), (5, p.score_size, p.score_size))
-            delta_x, delta_y = best_pscore_id_mask[2], best_pscore_id_mask[1] # delta_x and delta_y are the selected coordinates in the volume
-            
-            if((delta_x, delta_y) not in deltas):
+            delta_x, delta_y = best_pscore_id_mask[2], best_pscore_id_mask[
+                1]  # delta_x and delta_y are the selected coordinates in the volume
+
+            if ((delta_x, delta_y) not in deltas):
                 # print("delta: (", delta_x, ", ", delta_y, ")")
-                deltas.append((delta_x,delta_y))
+                deltas.append((delta_x, delta_y))
                 if refine_enable:
                     mask = net.track_refine((delta_y, delta_x)).to(device).sigmoid().squeeze().view(
                         p.out_size, p.out_size).cpu().data.numpy()
@@ -396,15 +393,15 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
                     mapping = np.array([[a, 0, c],
                                         [0, b, d]]).astype(np.float)
                     crop = cv2.warpAffine(image, mapping, (out_sz[0], out_sz[1]),
-                                        flags=cv2.INTER_LINEAR,
-                                        borderMode=cv2.BORDER_CONSTANT,
-                                        borderValue=padding)
+                                          flags=cv2.INTER_LINEAR,
+                                          borderMode=cv2.BORDER_CONSTANT,
+                                          borderValue=padding)
                     return crop
-                
+
                 s = crop_box[2] / p.instance_size
                 sub_box = [crop_box[0] + (delta_x - p.base_size / 2) * p.total_stride * s,
-                        crop_box[1] + (delta_y - p.base_size / 2) * p.total_stride * s,
-                        s * p.exemplar_size, s * p.exemplar_size]
+                           crop_box[1] + (delta_y - p.base_size / 2) * p.total_stride * s,
+                           s * p.exemplar_size, s * p.exemplar_size]
                 s = p.out_size / sub_box[2]
                 back_box = [-sub_box[0] * s, -sub_box[1] * s, state['im_w'] * s, state['im_h'] * s]
                 mask_in_img = crop_back(mask, back_box, (state['im_w'], state['im_h']))
@@ -424,29 +421,29 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
                     # box_in_img = pbox
                     rbox_in_img = prbox
                     box_score = bboxes[4, idx]
-                    rboxes.append( [rbox_in_img, box_score ])
+                    rboxes.append([rbox_in_img, box_score])
                     # if(len(deltas) == 1):
                     #     attmap[delta_x, delta_y] = 3.5
-                    # else: 
+                    # else:
                     #     attmap[delta_x, delta_y] = 1.5
 
-                    if(debug):
-                        
+                    if (debug):
+
                         im_debug_overlay = im_debug.copy()
-                        im_debug_overlay[:,:,:] = np.array([0.0, 0.0, 0.0])
-                        torch_data = np.float64(im_debug_overlay[:,:,0].copy())
+                        im_debug_overlay[:, :, :] = np.array([0.0, 0.0, 0.0])
+                        torch_data = np.float64(im_debug_overlay[:, :, 0].copy())
                         patch_size = crop_box_int[0]
-                        num_deltas = 25 # aixo no varia
-                        patch_ratio = int(patch_size/num_deltas) # aixo varia
-                        resized_img_h, resized_img_w = im_debug.shape[0]/5, im_debug.shape[1]/5
+                        num_deltas = 25  # aixo no varia
+                        patch_ratio = int(patch_size / num_deltas)  # aixo varia
+                        resized_img_h, resized_img_w = im_debug.shape[0] / 5, im_debug.shape[1] / 5
 
-                        torch_data_delta_size = np.zeros( ( int(resized_img_h), int(resized_img_w) ) )
-                        offset_x_deltas = int(crop_box_int[0]/5)
-                        offset_y_deltas = int(crop_box_int[1]/5)
+                        torch_data_delta_size = np.zeros((int(resized_img_h), int(resized_img_w)))
+                        offset_x_deltas = int(crop_box_int[0] / 5)
+                        offset_y_deltas = int(crop_box_int[1] / 5)
 
-                        length_x = int((crop_box_int[2])/5)
-                        length_y = int((crop_box_int[3])/5)
-                        
+                        length_x = int((crop_box_int[2]) / 5)
+                        length_y = int((crop_box_int[3]) / 5)
+
                         for i in range(25):
                             for j in range(25):
                                 # step_x = crop_box_int[0] + i*length_x
@@ -455,21 +452,20 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
                                 # im_debug_overlay[step_y: step_y + length_y, step_x: step_x+length_x, :] = np.uint8(attmap[j,i] * np.array([0,165,255]))
                                 # torch_data[step_y: step_y + length_y, step_x: step_x+length_x] = attmap[j,i]*1.0
                                 # Now for the reshaped
-                                torch_data_delta_size[offset_y_deltas+j, offset_x_deltas+i] = attmap[j,i]*1.0
-                                if(pscore[best_pscore_id] > best_score_threshold):
-                                    torch_data_delta_size[offset_y_deltas+delta_y, offset_x_deltas+delta_x] = 3.0
+                                torch_data_delta_size[offset_y_deltas + j, offset_x_deltas + i] = attmap[j, i] * 1.0
+                                if (pscore[best_pscore_id] > best_score_threshold):
+                                    torch_data_delta_size[offset_y_deltas + delta_y, offset_x_deltas + delta_x] = 3.0
 
-                        if(pscore[best_pscore_id] > best_score_threshold):
+                        if (pscore[best_pscore_id] > best_score_threshold):
                             sma = torch.nn.Softmax()
-                            torch_data_delta_size = sma( torch.from_numpy(np.exp(torch_data_delta_size)) ).numpy()
+                            torch_data_delta_size = sma(torch.from_numpy(np.exp(torch_data_delta_size))).numpy()
 
-                                # im_debug_overlay[step_x: step_x+length_x, step_y: step_y + length_y, :] = attmap[j,i]
+                            # im_debug_overlay[step_x: step_x+length_x, step_y: step_y + length_y, :] = attmap[j,i]
 
-                                
                         overlay_result = cv2.addWeighted(im_debug, 0.70, im_debug_overlay, 0.3, 0.0)
                         # cv2.imwrite('/data/Ponc/tracking/results/windows-seagulls-debug/'+'search_'+str(arrendatario)+'.jpeg', overlay_result)
                         # np.save('/data/Ponc/tracking/torch_data/resized/'+"{:05d}".format(arrendatario)+'.npy', torch_data_delta_size)
-                        
+
                     # np.save('/data/Ponc/tracking/results/mevasa/'+"{:05d}".format(arrendatario)+'.npy', attmap)
                 else:  # empty mask
                     location = cxy_wh_2_rect(target_pos, target_sz)
@@ -477,31 +473,21 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
                                             [location[0] + location[2], location[1]],
                                             [location[0] + location[2], location[1] + location[3]],
                                             [location[0], location[1] + location[3]]])
-        if(pscore[best_pscore_id]>best_score_threshold):
+        if (pscore[best_pscore_id] > best_score_threshold):
             break
-    
+
     target_pos[0] = max(0, min(state['im_w'], target_pos[0]))
     target_pos[1] = max(0, min(state['im_h'], target_pos[1]))
     target_sz[0] = max(10, min(state['im_w'], target_sz[0]))
     target_sz[1] = max(10, min(state['im_h'], target_sz[1]))
     state['target_pos'] = target_pos
     state['target_sz'] = target_sz
-    new_score = bboxes[4,0]
+    new_score = bboxes[4, 0]
     # state['score'] = score[best_pscore_id]
     state['score'] = new_score
     state['mask'] = mask_in_img if mask_enable else []
     state['ploygon'] = rbox_in_img if mask_enable else []
     return state, bboxes, rboxes
-
-
-
-
-
-
-
-
-
-
 
 
 def track_vot(model, video, hp=None, mask_enable=False, refine_enable=False, device='cpu'):
@@ -561,7 +547,8 @@ def track_vot(model, video, hp=None, mask_enable=False, refine_enable=False, dev
                 if len(gt[f]) == 8:
                     cv2.polylines(im_show, [np.array(gt[f], np.int).reshape((-1, 1, 2))], True, (0, 255, 0), 3)
                 else:
-                    cv2.rectangle(im_show, (gt[f, 0], gt[f, 1]), (gt[f, 0] + gt[f, 2], gt[f, 1] + gt[f, 3]), (0, 255, 0), 3)
+                    cv2.rectangle(im_show, (gt[f, 0], gt[f, 1]), (gt[f, 0] + gt[f, 2], gt[f, 1] + gt[f, 3]),
+                                  (0, 255, 0), 3)
             if len(location) == 8:
                 if mask_enable:
                     mask = mask > state['p'].seg_thr
@@ -574,14 +561,15 @@ def track_vot(model, video, hp=None, mask_enable=False, refine_enable=False, dev
                               (location[0] + location[2], location[1] + location[3]), (0, 255, 255), 3)
             cv2.putText(im_show, str(f), (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
             cv2.putText(im_show, str(lost_times), (40, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            cv2.putText(im_show, str(state['score']) if 'score' in state else '', (40, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            cv2.putText(im_show, str(state['score']) if 'score' in state else '', (40, 120), cv2.FONT_HERSHEY_SIMPLEX,
+                        1, (0, 0, 255), 2)
 
             cv2.imshow(video['name'], im_show)
             cv2.waitKey(1)
     toc /= cv2.getTickFrequency()
 
     # save result
-    name = args.arch.split('.')[0] + '_' + ('mask_' if mask_enable else '') + ('refine_' if refine_enable else '') +\
+    name = args.arch.split('.')[0] + '_' + ('mask_' if mask_enable else '') + ('refine_' if refine_enable else '') + \
            args.resume.split('/')[-1].split('.')[0]
 
     if 'VOT' in args.dataset:
@@ -592,14 +580,14 @@ def track_vot(model, video, hp=None, mask_enable=False, refine_enable=False, dev
         with open(result_path, "w") as fin:
             for x in regions:
                 fin.write("{:d}\n".format(x)) if isinstance(x, int) else \
-                        fin.write(','.join([vot_float2str("%.4f", i) for i in x]) + '\n')
+                    fin.write(','.join([vot_float2str("%.4f", i) for i in x]) + '\n')
     else:  # OTB
         video_path = join('test', args.dataset, name)
         if not isdir(video_path): makedirs(video_path)
         result_path = join(video_path, '{:s}.txt'.format(video['name']))
         with open(result_path, "w") as fin:
             for x in regions:
-                fin.write(','.join([str(i) for i in x])+'\n')
+                fin.write(','.join([str(i) for i in x]) + '\n')
 
     logger.info('({:d}) Video: {:12s} Time: {:02.1f}s Speed: {:3.1f}fps Lost: {:d}'.format(
         v_id, video['name'], toc, f / toc, lost_times))
@@ -620,7 +608,7 @@ def MultiBatchIouMeter(thrs, outputs, targets, start=None, end=None):
     num_object = len(object_ids)
     res = np.zeros((num_object, len(thrs)), dtype=np.float32)
 
-    output_max_id = np.argmax(outputs, axis=0).astype('uint8')+1
+    output_max_id = np.argmax(outputs, axis=0).astype('uint8') + 1
     outputs_max = np.max(outputs, axis=0)
     for k, thr in enumerate(thrs):
         output_thr = outputs_max > thr
@@ -633,7 +621,7 @@ def MultiBatchIouMeter(thrs, outputs, targets, start=None, end=None):
                 start_frame, end_frame = start[str(object_ids[j])] + 1, end[str(object_ids[j])] - 1
             iou = []
             for i in range(start_frame, end_frame):
-                pred = (output_thr[i] * output_max_id[i]) == (j+1)
+                pred = (output_thr[i] * output_max_id[i]) == (j + 1)
                 mask_sum = (pred == 1).astype(np.uint8) + (target_j[i] > 0).astype(np.uint8)
                 intxn = np.sum(mask_sum == 2)
                 union = np.sum(mask_sum > 0)
@@ -663,10 +651,10 @@ def track_vos(model, video, hp=None, mask_enable=False, refine_enable=False, mot
     else:
         object_ids = [o_id for o_id in np.unique(annos[0]) if o_id != 0]
         if len(object_ids) != len(annos_init):
-            annos_init = annos_init*len(object_ids)
+            annos_init = annos_init * len(object_ids)
     object_num = len(object_ids)
     toc = 0
-    pred_masks = np.zeros((object_num, len(image_files), annos[0].shape[0], annos[0].shape[1]))-1
+    pred_masks = np.zeros((object_num, len(image_files), annos[0].shape[0], annos[0].shape[1])) - 1
     for obj_id, o_id in enumerate(object_ids):
 
         if 'start_frame' in video:
@@ -681,7 +669,7 @@ def track_vos(model, video, hp=None, mask_enable=False, refine_enable=False, mot
             if f == start_frame:  # init
                 mask = annos_init[obj_id] == o_id
                 x, y, w, h = cv2.boundingRect((mask).astype(np.uint8))
-                cx, cy = x + w/2, y + h/2
+                cx, cy = x + w / 2, y + h / 2
                 target_pos = np.array([cx, cy])
                 target_sz = np.array([w, h])
                 state = siamese_init(im, target_pos, target_sz, model, hp, device=device)  # init tracker
@@ -699,8 +687,9 @@ def track_vos(model, video, hp=None, mask_enable=False, refine_enable=False, mot
                                             end=video['end_frame'] if 'end_frame' in video else None)
         for i in range(object_num):
             for j, thr in enumerate(thrs):
-                logger.info('Fusion Multi Object{:20s} IOU at {:.2f}: {:.4f}'.format(video['name'] + '_' + str(i + 1), thr,
-                                                                           multi_mean_iou[i, j]))
+                logger.info(
+                    'Fusion Multi Object{:20s} IOU at {:.2f}: {:.4f}'.format(video['name'] + '_' + str(i + 1), thr,
+                                                                             multi_mean_iou[i, j]))
     else:
         multi_mean_iou = []
 
@@ -709,26 +698,27 @@ def track_vos(model, video, hp=None, mask_enable=False, refine_enable=False, mot
         if not isdir(video_path): makedirs(video_path)
         pred_mask_final = np.array(pred_masks)
         pred_mask_final = (np.argmax(pred_mask_final, axis=0).astype('uint8') + 1) * (
-                np.max(pred_mask_final, axis=0) > state['p'].seg_thr).astype('uint8')
+          np.max(pred_mask_final, axis=0) > state['p'].seg_thr).astype('uint8')
         for i in range(pred_mask_final.shape[0]):
-            cv2.imwrite(join(video_path, image_files[i].split('/')[-1].split('.')[0] + '.png'), pred_mask_final[i].astype(np.uint8))
+            cv2.imwrite(join(video_path, image_files[i].split('/')[-1].split('.')[0] + '.png'),
+                        pred_mask_final[i].astype(np.uint8))
 
     if args.visualization:
         pred_mask_final = np.array(pred_masks)
         pred_mask_final = (np.argmax(pred_mask_final, axis=0).astype('uint8') + 1) * (
-                np.max(pred_mask_final, axis=0) > state['p'].seg_thr).astype('uint8')
+          np.max(pred_mask_final, axis=0) > state['p'].seg_thr).astype('uint8')
         COLORS = np.random.randint(128, 255, size=(object_num, 3), dtype="uint8")
         COLORS = np.vstack([[0, 0, 0], COLORS]).astype("uint8")
         mask = COLORS[pred_mask_final]
         for f, image_file in enumerate(image_files):
-            output = ((0.4 * cv2.imread(image_file)) + (0.6 * mask[f,:,:,:])).astype("uint8")
+            output = ((0.4 * cv2.imread(image_file)) + (0.6 * mask[f, :, :, :])).astype("uint8")
             cv2.imshow("mask", output)
             cv2.waitKey(1)
 
     logger.info('({:d}) Video: {:12s} Time: {:02.1f}s Speed: {:3.1f}fps'.format(
-        v_id, video['name'], toc, f*len(object_ids) / toc))
+        v_id, video['name'], toc, f * len(object_ids) / toc))
 
-    return multi_mean_iou, f*len(object_ids) / toc
+    return multi_mean_iou, f * len(object_ids) / toc
 
 
 def main():
@@ -775,11 +765,11 @@ def main():
 
         if vos_enable:
             iou_list, speed = track_vos(model, dataset[video], cfg['hp'] if 'hp' in cfg.keys() else None,
-                                 args.mask, args.refine, args.dataset in ['DAVIS2017', 'ytb_vos'], device=device)
+                                        args.mask, args.refine, args.dataset in ['DAVIS2017', 'ytb_vos'], device=device)
             iou_lists.append(iou_list)
         else:
             lost, speed = track_vot(model, dataset[video], cfg['hp'] if 'hp' in cfg.keys() else None,
-                             args.mask, args.refine, device=device)
+                                    args.mask, args.refine, device=device)
             total_lost += lost
         speed_list.append(speed)
 
@@ -791,6 +781,49 @@ def main():
         logger.info('Total Lost: {:d}'.format(total_lost))
 
     logger.info('Mean Speed: {:.2f} FPS'.format(np.mean(speed_list)))
+
+
+def append_pred(pred, frame, objectID, x, y, w, h):
+    my_dict = {'FrameID': frame, 'ObjectID': objectID, 'x_topleft': x, 'y_topleft': y, 'Width': w, 'Height': h,
+              'isActive': 1, 'isOccluded': 0}
+    pred = pred.append(pd.DataFrame(my_dict, index=[0]))
+    return pred
+
+
+def create_colormap_hsv(num_col):
+    colors = []
+    addGrayScale = False
+    rounds = 3
+    np.random.seed(2)
+    if num_col <= 8:
+        rounds = 1
+        div = num_col
+    elif num_col <= 20:
+        div = 7
+    else:
+        div = int(np.ceil(num_col / 3))
+        addGrayScale = True
+    if addGrayScale:
+        colors.append((220, 220, 220))
+        colors.append((20, 20, 20))
+        colors.append((127, 127, 127))
+    portion = 180 / div
+    ss = [255, 255, 100]
+    vs = [255, 100, 255]
+    for j in range(rounds):
+        s = ss[j]
+        v = vs[j]
+        for i in range(div):
+            h = int(portion * i)
+            color_hsv = np.uint8([[[h, s, v]]])
+            color_bgr = cv2.cvtColor(color_hsv, cv2.COLOR_HSV2BGR)
+            color_bgr = color_bgr[0][0]
+            color_bgr = [int(cha) for cha in color_bgr]
+            colors.append(tuple(color_bgr))
+    colors = colors[0:num_col]
+    np.random.shuffle(colors)
+    return colors
+
 
 
 if __name__ == '__main__':
