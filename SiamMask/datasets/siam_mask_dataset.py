@@ -33,7 +33,7 @@ class SubDataSet(object):
                 raise Exception('SubDataSet need "{}"'.format(string))
 
         with open(cfg['anno']) as fin:
-            logger.info("loading " + cfg['anno'])
+            # logger.info("loading " + cfg['anno'])
             self.labels = self.filter_zero(json.load(fin), cfg)
 
             def isint(x):

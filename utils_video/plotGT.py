@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import os
+from utils_plot import *
 
 
 def get_location(gt):
@@ -20,7 +21,7 @@ font_size = 0.4
 
 # Parameters
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
-num_frames = 10
+num_frames = 50
 root = '/Users/marinaalonsopoal/Desktop/Tracking/Datasets'
 
 if dataset == 0:  # 2DMOT2015
@@ -29,7 +30,7 @@ if dataset == 0:  # 2DMOT2015
     gt_path = root + '/2DMOT2015/train/PETS09-S2L1/gt/gt_MOT_pr.txt'
     save_path = root + '/2DMOT2015/train/PETS09-S2L1/gt_plot/'
 elif dataset == 1:  # SMOT
-    sequence = 'tud-crossing'
+    sequence = 'seagulls'
     title = 'Dataset: SMOT Sequence: ' + sequence
     img_path = root + '/SMOT/' + sequence + '/img/'
     gt_path = root + '/SMOT/' + sequence + '/gt/gt.txt'

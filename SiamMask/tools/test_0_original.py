@@ -169,13 +169,14 @@ def siamese_init(im, target_pos, target_sz, model, hp=None, device='cpu'):
     return state
 
 
-def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu', debug=False):
+def siamese_track(state, im, model, mask_enable=False, refine_enable=False, device='cpu', debug=False):
     p = state['p']
     net = state['net']
     avg_chans = state['avg_chans']
     window = state['window']
     target_pos = state['target_pos']
     target_sz = state['target_sz']
+    net = model
 
     wc_x = target_sz[1] + p.context_amount * sum(target_sz)
     hc_x = target_sz[0] + p.context_amount * sum(target_sz)

@@ -36,7 +36,6 @@ video = 'video0'
 max_num_obj = 20
 print('\nDataset:', dataset_name[dataset], ' Sequence:', sequence)
 
-
 img_path, init_path, results_path, centroids_path, dataset = get_paths(dataset, sequence, video)
 init_path = '/data/SMOT/' + sequence + '/gt/init_old2.txt'
 title = 'Dataset:' + dataset + ' Sequence:' + sequence
@@ -51,7 +50,6 @@ pred = init.copy()
 
 total_obj = init.ObjectID.unique()  # [5, 34, 65, 2...]
 print('total object', total_obj)
-
 
 colors = create_colormap_hsv(5)
 
@@ -75,7 +73,6 @@ if __name__ == '__main__':
         siammask.eval().to(device)
         tracker[obj] = siammask
         print('Tracker:', obj, ' Initialized')
-
 
     # Parse Image files
     img_files = sorted(glob.glob(join(img_path, '*.jp*')))[000:num_frames]
@@ -111,9 +108,9 @@ if __name__ == '__main__':
             #     list_siammasks[ob - 1] = siammask
 
             nested_obj = {'target_pos': np.array([x + w / 2, y + h / 2]), 'target_sz': np.array([w, h]),
-                              'init_frame': f, 'siammask': tracker[ob]}
-            
-            state = siamese_init(im, nested_obj['target_pos'], nested_obj['target_sz'],  nested_obj['siammask'],
+                          'init_frame': f, 'siammask': tracker[ob]}
+
+            state = siamese_init(im, nested_obj['target_pos'], nested_obj['target_sz'], nested_obj['siammask'],
                                  cfg['hp'], device=device)
             nested_obj['state'] = state
             objects[ob] = nested_obj
@@ -128,51 +125,17 @@ if __name__ == '__main__':
                 # state, bboxes, rboxes = siamese_track(value['state'], im, value['siammask'], mask_enable=True,
                 #                                       refine_enable=True, device=device)
                 state = siamese_track(value['state'], im, mask_enable=True,
-                                                      refine_enable=True, device=device)
+                                      refine_enable=True, device=device)
                 value['state'] = state
-                # # Filter overlapping boxes
-                # if filter_boxes:
-                #     rboxes = filter_bboxes(rboxes, 10, c=10 * len(rboxes))
-                #
-                # if draw_candidates:
-                #     for box in range(len(rboxes)):
-                #         location = rboxes[box][0].flatten()
-                #         location = np.int0(location).reshape((-1, 1, 2))
-                #         traj = np.average(location, axis=0)[0]
-                #         frame_boxes.append([traj])
-                #         cv2.polylines(im, [location], True, colors[key - 1], 1)
-                #         # Draw Centroids
-                #         # cv2.circle(im, (int(traj[0]), int(traj[1])), 1, colors[key - 1], -1)
-                #
-                # location = value['state']['ploygon'].flatten()
-                # laloc = np.int0(location).reshape((-1, 1, 2))
-                # traj = np.int0(np.average(laloc, axis=0)[0])
-                # frame_boxes.append([traj])
-                # # all_centroids[key].append(frame_boxes)
-                #
-                # if bbox_rotated:
-                #     cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, colors[key - 1], 3)
-                # else:
-                #     # Work with axis-alligned bboxes
-                #     x1, y1, w1, h1 = get_aligned_bbox(location)
-                #     cv2.rectangle(im, (int(x1), int(y1)), (int(x1) + int(w1), int(y1) + int(h1)), colors[key - 1], 5)
-                #
-                #
-                # # pred = append_pred(pred, f + 1, key, x1, y1, w1, h1)
-                #
-                # # Draw bounding box, centroid (and mask) of chosen candidate
-                # # cv2.circle(im, (int(traj[0]), int(traj[1])), 3, colors[key-1], -1)
-                #
-                # if draw_mask:
-                #     mask = state['mask'] > state['p'].seg_thr
-                #     im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
 
                 location = state['ploygon'].flatten()
                 mask = state['mask'] > state['p'].seg_thr
                 im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
                 laloc = np.int0(location).reshape((-1, 1, 2))
                 traj = np.int0(np.average(laloc, axis=0)[0])
-                cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, (0,0,255), 3)
+                for i in range(laloc.shape[0]):
+                    cv2.circle(im, (laloc[i, 0, 0], laloc[i, 0, 1]), 6, (0, 0, 255))
+                    cv2.circle(im, (traj[0], traj[1]), 3, (255, 255, 0), 2)
 
         cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
 

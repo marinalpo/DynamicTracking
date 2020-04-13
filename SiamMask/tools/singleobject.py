@@ -10,6 +10,7 @@ from tools.test_1_raw import *
 from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
 from shapely.geometry import Polygon
 from shapely.geometry import asPolygon
+from utils.bbox_helper import get_aligned_bbox
 parser = argparse.ArgumentParser(description='PyTorch Tracking Demo')
 
 parser.add_argument('--resume', default='', type=str, required=True,
@@ -21,7 +22,9 @@ parser.add_argument('--cpu', action='store_true', help='cpu mode')
 args = parser.parse_args()
 
 
+
 if __name__ == '__main__':
+    base_path = '/data/SMOT/acrobats/img/'
     # Setup device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
@@ -39,29 +42,30 @@ if __name__ == '__main__':
     
     # Parse Image file
     # img_files = sorted(glob.glob(join(args.base_path, '*.jp*')))[772:805] # NHL
-    img_files = sorted(glob.glob(join(args.base_path, '*.jp*')))[00:20] # NFL
+    img_files = sorted(glob.glob(join(base_path, '*.jp*')))[00:40] # NFL
     
     ims = [cv2.imread(imf) for imf in img_files]
     
     try:
         # init_rect = cv2.selectROI('SiamMask', ims[0], False, False)
-        init_rect = (737,165, 76, 76) # balls noia
-        init_rect = (75,388, 200, 79) # Seagull
+        init_rect = (737, 165, 76, 76) # balls noia
+        init_rect = (75, 388, 200, 79) # Seagull
         # init_rect = (536,105, 41, 40) # juggling-easy
         init_rect = (437, 306, 115,50) # Eagles
         init_rect = (737, 374, 100, 156) # NHL
         init_rect = (1027, 259, 57, 100) # NFL
-        init_rect = (912, 457, 89, 101)  # ACROBATS
+        init_rect = (932.61, 325.61, 75.932, 143.07)  # ACROBATS
         x, y, w, h = init_rect
 
     except:
         exit()
 
     toc = 0
-    print("num images ",len(ims))
+    print("num images ", len(ims))
 
 
     for f, im in enumerate(ims):
+        print('frame', f)
         tic = cv2.getTickCount()
         frame_boxes = []
         if f == 0:  # init
@@ -85,7 +89,9 @@ if __name__ == '__main__':
             
             cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, (0, 255, 0), 3)
             cv2.putText(im,str(state['score']),(50,50),cv2.FONT_HERSHEY_COMPLEX,1.0,(0,255,0))
-            cv2.imwrite('/data/results3/' + str(f) + '.jpeg', im)
+            x1, y1, w1, h1 = get_aligned_bbox(location)
+            cv2.rectangle(im, (int(x1), int(y1)), (int(x1) + int(w1), int(y1) + int(h1)), (0, 255, 0), 5)
+            cv2.imwrite('/data/results/' + str(f) + '.jpg', im)
 
         toc += cv2.getTickCount() - tic
 

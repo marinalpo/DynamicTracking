@@ -63,7 +63,7 @@ class MultiStageFeature(Features):
         for p in self.parameters():
             p.requires_grad = False
 
-        logger.info('Current training {} layers:\n\t'.format(self.train_num, self.train_layers()))
+        # logger.info('Current training {} layers:\n\t'.format(self.train_num, self.train_layers()))
         for m in self.train_layers():
             for p in m.parameters():
                 p.requires_grad = True
