@@ -185,17 +185,7 @@ def siamese_init(im, target_pos, target_sz, model, hp=None, device='cpu'):
     return state
 
 
-
-
-
-
-
-
-
-
-
 def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu', debug=False):
-    global arrendatario
     p = state['p']
     net = state['net']
     avg_chans = state['avg_chans']

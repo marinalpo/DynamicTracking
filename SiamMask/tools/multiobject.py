@@ -33,13 +33,13 @@ num_frames = 40
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
 sequence = 'acrobats'
 video = 'video0'
-max_num_obj = 20
+max_num_obj = 2
 print('\nDataset:', dataset_name[dataset], ' Sequence:', sequence)
 
 
 img_path, init_path, results_path, centroids_path, dataset = get_paths(dataset, sequence, video)
-init_path = '/data/SMOT/' + sequence + '/gt/init_old2.txt'
-title = 'Dataset:' + dataset + ' Sequence:' + sequence
+init_path = '/data/SMOT/' + sequence + '/gt/init_old.txt'
+title = 'Dataset: ' + dataset + ' Sequence: ' + sequence
 init = pd.read_csv(init_path, sep=',', header=None)
 print(init)
 
@@ -87,8 +87,8 @@ if __name__ == '__main__':
 
     for f, im in enumerate(ims):
         print('Frame:', f + 1)
-        cv2.putText(im, title, (10, 30), font, font_size, (0, 0, 0), 2, cv2.LINE_AA)
-        cv2.putText(im, 'Frame: ' + str(f), (10, 60), font, font_size * 0.75, (0, 0, 0), 2, cv2.LINE_AA)
+        cv2.putText(im, title, (10, 30), font, font_size, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.putText(im, 'Frame: ' + str(f), (10, 60), font, font_size * 0.75, (255, 255, 255), 2, cv2.LINE_AA)
         tic = cv2.getTickCount()
 
         # Get number of objects that are initialized in this frame
@@ -121,13 +121,14 @@ if __name__ == '__main__':
 
         if f > 0:  # Perform tracking
             for key, value in objects.items():
+                print('Key:', key)
                 if value['init_frame'] == f:
                     print('Not going to track at this frame')
                     continue
                 frame_boxes = []
                 # state, bboxes, rboxes = siamese_track(value['state'], im, value['siammask'], mask_enable=True,
                 #                                       refine_enable=True, device=device)
-                state = siamese_track(value['state'], im, mask_enable=True,
+                state = siamese_track(key, f, value['state'], im, mask_enable=True,
                                                       refine_enable=True, device=device)
                 value['state'] = state
                 # # Filter overlapping boxes
@@ -167,14 +168,14 @@ if __name__ == '__main__':
                 #     mask = state['mask'] > state['p'].seg_thr
                 #     im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
 
-                location = state['ploygon'].flatten()
-                mask = state['mask'] > state['p'].seg_thr
-                im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
-                laloc = np.int0(location).reshape((-1, 1, 2))
-                traj = np.int0(np.average(laloc, axis=0)[0])
-                cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, (0,0,255), 3)
+                # location = state['ploygon'].flatten()
+                # mask = state['mask'] > state['p'].seg_thr
+                # im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
+                # laloc = np.int0(location).reshape((-1, 1, 2))
+                # traj = np.int0(np.average(laloc, axis=0)[0])
+                # cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, (0, 255, 0), 3)
 
-        cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
+        # cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
 
         toc += cv2.getTickCount() - tic
 

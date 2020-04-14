@@ -261,8 +261,9 @@ def siamese_init(im, target_pos, target_sz, model, hp=None, device='cpu'):
     s_z = round(np.sqrt(wc_z * hc_z))
     # initialize the exemplar
     z_crop = get_subwindow_tracking(im, target_pos, p.exemplar_size, s_z, avg_chans)
-    # print("z size (patch) ", z_crop.size())
+    print("z size (patch) ", z_crop.size())
     z = Variable(z_crop.unsqueeze(0))
+    print('z', z)
     # La xarxa es guarda les features resultants (self.zf) d'haver passat el patch z per la siamesa
     net.template(z.to(device))
 
@@ -279,6 +280,7 @@ def siamese_init(im, target_pos, target_sz, model, hp=None, device='cpu'):
     state['target_pos'] = target_pos
     state['target_sz'] = target_sz
     # print("window = ", state['window'])
+    print('State:', state)
     return state
 
 
@@ -515,7 +517,7 @@ def siamese_init(im, target_pos, target_sz, model, hp=None, device='cpu'):
 #     return state, bboxes, rboxes
 
 
-def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu', debug=False):
+def siamese_track(key, f, state, im, mask_enable=False, refine_enable=False, device='cpu', debug=False):
     global arrendatario
     p = state['p']
     net = state['net']
@@ -523,6 +525,7 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
     window = state['window']
     target_pos = state['target_pos']
     target_sz = state['target_sz']
+
     wc_x = target_sz[1] + p.context_amount * sum(target_sz)
     hc_x = target_sz[0] + p.context_amount * sum(target_sz)
     s_x = np.sqrt(wc_x * hc_x)
@@ -538,8 +541,10 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
         crop_box_int = np.int0(crop_box)
         cv2.rectangle(im_debug, (crop_box_int[0], crop_box_int[1]),
                       (crop_box_int[0] + crop_box_int[2], crop_box_int[1] + crop_box_int[3]), (255, 255, 0), 2)
-        # cv2.imwrite('/data/Ponc/tracking/results/windows-seagulls-debug/'+'search_'+str(arrendatario)+'.jpeg', im_debug)
-        cv2.waitKey(0)
+        cv2.putText(im_debug, 'Frame:'+str(f), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.putText(im_debug, 'key:' + str(key), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+        cv2.imwrite('/data/results/search_' +str(f)+'_key_'+str(key)+'single.jpeg', im_debug)
+        # cv2.waitKey(0)
 
     # extract scaled crops for search region x at previous target position
     x_crop = Variable(get_subwindow_tracking(im, target_pos, p.instance_size, round(s_x), avg_chans).unsqueeze(0))

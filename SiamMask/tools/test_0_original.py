@@ -313,6 +313,7 @@ def siamese_track(state, im, model, mask_enable=False, refine_enable=False, devi
     state['score'] = score[best_pscore_id]
     state['mask'] = mask_in_img if mask_enable else []
     state['ploygon'] = rbox_in_img if mask_enable else []
+    print(pscore)
     return state
 
 
