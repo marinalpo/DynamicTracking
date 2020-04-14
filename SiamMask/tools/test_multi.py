@@ -237,34 +237,47 @@ def generate_anchor(cfg, score_size):
     return anchor
 
 
-def siamese_init(im, target_pos, target_sz, model, hp=None, device='cpu'):
-    # print("------siamese_init-------")
+def siamese_init(ob, im, target_pos, target_sz, model, hp=None, device='cpu'):
+
     state = dict()
     state['im_h'] = im.shape[0]
     state['im_w'] = im.shape[1]
-    # print("im.shape[0] ", im.shape[0])
-    p = TrackerConfig()
-    p.update(hp, model.anchors)
 
+    p = TrackerConfig()  # default hyper-params for SiamMask: stride, learning rate...
+    p.update(hp, model.anchors)
+    # hp: 'instance_size': 255, 'base_size': 8, 'out_size': 127, 'seg_thr': 0.35,
+    # 'penalty_k': 0.04, 'window_influence': 0.4, 'lr': 1.0
+    # model.anchors: {'stride': 8, 'ratios': [0.33, 0.5, 1, 2, 3], 'scales': [8], 'round_dight': 0}
     p.renew()
 
     net = model
     p.scales = model.anchors['scales']
     p.ratios = model.anchors['ratios']
     p.anchor_num = model.anchor_num
-
     p.anchor = generate_anchor(model.anchors, p.score_size)
     avg_chans = np.mean(im, axis=(0, 1))
 
     wc_z = target_sz[0] + p.context_amount * sum(target_sz)
     hc_z = target_sz[1] + p.context_amount * sum(target_sz)
     s_z = round(np.sqrt(wc_z * hc_z))
+
     # initialize the exemplar
     z_crop = get_subwindow_tracking(im, target_pos, p.exemplar_size, s_z, avg_chans)
-    print("z size (patch) ", z_crop.size())
+    # z_crop size: torchSize([3, 127, 127)]
+    print('z before size:', z_crop.size)
+
+    if ob == 4:
+        path = '/data/results/z_Single.npy'
+        z_crop = np.load(path)
+        z_crop = torch.from_numpy(z_crop)
+        print('z after size:', z_crop.size)
+
     z = Variable(z_crop.unsqueeze(0))
-    print('z', z)
+
+
+
     # La xarxa es guarda les features resultants (self.zf) d'haver passat el patch z per la siamesa
+
     net.template(z.to(device))
 
     if p.windowing == 'cosine':
@@ -280,8 +293,7 @@ def siamese_init(im, target_pos, target_sz, model, hp=None, device='cpu'):
     state['target_pos'] = target_pos
     state['target_sz'] = target_sz
     # print("window = ", state['window'])
-    print('State:', state)
-    return state
+    return state, z_crop
 
 
 # def siamese_track(state, im, model, mask_enable=False, refine_enable=False, device='cpu', debug=False):
