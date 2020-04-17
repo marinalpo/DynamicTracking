@@ -5,10 +5,8 @@ import pickle
 import argparse
 import pandas as pd
 import torch
-import json
 from tools.test_multi import *
 from utils.bbox_helper import get_aligned_bbox
-from shapely.geometry import asPolygon
 from custom import Custom
 
 parser = argparse.ArgumentParser(description='PyTorch Tracking Demo')
@@ -22,58 +20,48 @@ args = parser.parse_args()
 font = cv2.FONT_HERSHEY_SIMPLEX
 font_size = 1
 columns_standard = ['FrameID', 'ObjectID', 'x_topleft', 'y_topleft', 'Width', 'Height', 'isActive', 'isOccluded']
-mode_name = ['Single', 'Multi']
+columns_location = ['FrameID', 'ObjectID', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4']
 dataset_name = ['MOT', 'SMOT', 'Stanford']
 
 # Parameters
-draw_mask = True
-draw_candidates = False
+draw_mask = False
+draw_candidates = True
 filter_boxes = False
 bbox_rotated = True
-num_frames = 5
+num_frames = 150  #155
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
 sequence = 'acrobats'
 video = 'video0'
 max_num_obj = 10
-# TODO: CHOOSE MODE
-mode = 1  # 0: Single, 1: Multi
 
 print('\nDataset:', dataset_name[dataset], ' Sequence:', sequence)
-print('Mode: ', mode_name[mode])
-
 
 img_path, init_path, results_path, centroids_path, dataset = get_paths(dataset, sequence, video)
-if mode == 0:
-    init_path = '/data/SMOT/' + sequence + '/gt/init_single.txt'
-else:
-    init_path = '/data/SMOT/' + sequence + '/gt/init_multi2.txt'
-
-save_npy = '/data/results/z_' + str(mode_name[mode]) + '.npy'
 title = 'Dataset: ' + dataset + ' Sequence: ' + sequence
 init = pd.read_csv(init_path, sep=',', header=None)
-
-# Assign column names
 init.columns = columns_standard
 init = init[init.FrameID < num_frames]
-print(init)
+print(init.head(10))
+
 # TODO: Get the only 10 objects that appear
 pred = init.copy()
 
 total_obj = init.ObjectID.unique()  # [5, 34, 65, 2...]
-# print('total object', total_obj)
+print('Number of objects to be tracked:', total_obj)
 colors = create_colormap_hsv(5)
 
 if __name__ == '__main__':
     toc = 0  # Timer
+    # To compare performance with single object tracking
+    df = pd.DataFrame(columns=columns_location)
 
     # Setup device and model
-    device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
     torch.backends.cudnn.benchmark = True
     cfg = load_config(args)
 
     # Initialize a SiamMask model for each object ID
     print('Initializing', len(total_obj), 'tracker(s)...')
-
     tracker = {}
     for obj in total_obj:
         siammask = Custom(anchors=cfg['anchors'])
@@ -88,16 +76,16 @@ if __name__ == '__main__':
     # Parse Image files
     img_files = sorted(glob.glob(join(img_path, '*.jp*')))[000:num_frames]
     ims = [cv2.imread(imf) for imf in img_files]
-    im_ori = ims[0]  # First frame
-
     all_centroids = {}  # Dict that will save all the objects trajectories and discarded candidates
     objects = {}
 
     for f, im in enumerate(ims):
-        print('Frame:', f + 1)
-        cv2.putText(im, title, (10, 30), font, font_size, (255, 255, 255), 2, cv2.LINE_AA)
-        cv2.putText(im, 'Frame: ' + str(f), (10, 60), font, font_size * 0.75, (255, 255, 255), 2, cv2.LINE_AA)
-        cv2.putText(im, 'Mode: ' + mode_name[mode], (10, 90), font, font_size * 0.75, (255, 0, 255), 2, cv2.LINE_AA)
+        print('Frame:', f)
+        im_init = im.copy()
+        im_track = im.copy()
+
+        # cv2.putText(im, title, (10, 30), font, font_size, (255, 255, 255), 2, cv2.LINE_AA)
+        # cv2.putText(im, 'Frame: ' + str(f), (10, 60), font, font_size * 0.75, (255, 255, 255), 2, cv2.LINE_AA)
         tic = cv2.getTickCount()
 
         # Get number of objects that are initialized in this frame
@@ -109,80 +97,78 @@ if __name__ == '__main__':
             w = row['Width']
             h = row['Height']
 
-            # if ob in objects:
-            #     print('OBJECT', ob, ' IS ALREADY IN THE DICTIONARY')
-            #     siammask = Custom(anchors=cfg['anchors'])
-            #     if args.resume:
-            #         assert isfile(args.resume), 'Please download {} first.'.format(args.resume)
-            #         siammask = load_pretrain(siammask, args.resume)
-            #     siammask.eval().to(device)
-            #     list_siammasks[ob - 1] = siammask
+            if ob in objects:
+                print('OBJECT', ob, ' IS ALREADY IN THE DICTIONARY')
+                siammask = Custom(anchors=cfg['anchors'])
+                if args.resume:
+                    assert isfile(args.resume), 'Please download {} first.'.format(args.resume)
+                    siammask = load_pretrain(siammask, args.resume)
+                siammask.eval().to(device)
+                tracker[ob] = siammask
 
             nested_obj = {'target_pos': np.array([x + w / 2, y + h / 2]), 'target_sz': np.array([w, h]),
-                              'init_frame': f}
-            print('nested_obj:', nested_obj)
-            nested_obj['siammask'] = tracker[ob]
-            state, z = siamese_init(ob, im, nested_obj['target_pos'], nested_obj['target_sz'],  nested_obj['siammask'],
-                                 cfg['hp'], device=device)
+                          'init_frame': f, 'siammask': tracker[ob]}
 
-            if ob == 4:
-                np.save(save_npy, z)
-            siam = nested_obj['siammask']
+            state, z = siamese_init(ob, im_init, nested_obj['target_pos'], nested_obj['target_sz'],
+                                    nested_obj['siammask'], cfg['hp'], device=device)
             nested_obj['state'] = state
             objects[ob] = nested_obj
-            cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), colors[ob - 1], 5)
+            cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (255, 255, 0), 5)
+            cv2.putText(im, 'init', (int(x), int(y)-7), font, font_size*0.75, (255, 255, 0), 2, cv2.LINE_AA)
 
-        if f > 0:  # Perform tracking
-            for key, value in objects.items():
-                print('Key:', key)
-                if value['init_frame'] == f:
-                    print('Not going to track at this frame')
-                    continue
-                frame_boxes = []
-                # state, bboxes, rboxes = siamese_track(value['state'], im, value['siammask'], mask_enable=True,
-                #                                       refine_enable=True, device=device)
-                state = siamese_track(key, f, value['state'], im, mask_enable=True,
+
+        print('\nTracking --------------------------------------------------')
+        for key, value in objects.items():
+            if value['init_frame'] == f:
+                print('Not going to track object ', key, 'at this frame')
+                continue
+            frame_boxes = []
+            # state, boxes, rboxes = siamese_track_plus(state=value['state'], im=im_track, mask_enable=True,
+            #                                           refine_enable=True, device=device)
+            state = siamese_track(state=value['state'], im=im_track, mask_enable=True,
                                                       refine_enable=True, device=device)
-                value['state'] = state
-                # # Filter overlapping boxes
-                # if filter_boxes:
-                #     rboxes = filter_bboxes(rboxes, 10, c=10 * len(rboxes))
-                #
-                # if draw_candidates:
-                #     for box in range(len(rboxes)):
-                #         location = rboxes[box][0].flatten()
-                #         location = np.int0(location).reshape((-1, 1, 2))
-                #         traj = np.average(location, axis=0)[0]
-                #         frame_boxes.append([traj])
-                #         cv2.polylines(im, [location], True, colors[key - 1], 1)
-                #         # Draw Centroids
-                #         # cv2.circle(im, (int(traj[0]), int(traj[1])), 1, colors[key - 1], -1)
-                #
-                location = value['state']['ploygon'].flatten()
-                laloc = np.int0(location).reshape((-1, 1, 2))
-                traj = np.int0(np.average(laloc, axis=0)[0])
-                frame_boxes.append([traj])
-                # all_centroids[key].append(frame_boxes)
 
-                if bbox_rotated:
-                    cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, colors[key - 1], 3)
-                else:
-                    # Work with axis-alligned bboxes
-                    x1, y1, w1, h1 = get_aligned_bbox(location)
-                    cv2.rectangle(im, (int(x1), int(y1)), (int(x1) + int(w1), int(y1) + int(h1)), colors[key - 1], 5)
+            value['state'] = state
+            # Filter overlapping boxes
+            # if filter_boxes:
+            #     rboxes = filter_bboxes(rboxes, 10, c=10 * len(rboxes))
+            #
+            # if draw_candidates:
+            #     for box in range(len(rboxes)):
+            #         location = rboxes[box][0].flatten()
+            #         location = np.int0(location).reshape((-1, 1, 2))
+            #         traj = np.average(location, axis=0)[0]
+            #         frame_boxes.append([traj])
+            #         cv2.polylines(im, [location], True, colors[key - 1], 1)
 
+            location = value['state']['ploygon'].flatten()
+            df = append_pred_single(f, key, location, df)
+            laloc = np.int0(location).reshape((-1, 1, 2))
+            traj = np.int0(np.average(laloc, axis=0)[0])
+            frame_boxes.append([traj])
+            # all_centroids[key].append(frame_boxes)
 
-                # pred = append_pred(pred, f + 1, key, x1, y1, w1, h1)
+            if bbox_rotated:
+                cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, colors[key - 1], 3)
 
-                # Draw bounding box, centroid (and mask) of chosen candidate
-                # cv2.circle(im, (int(traj[0]), int(traj[1])), 3, colors[key-1], -1)
+            else:
+                # Work with axis-alligned bboxes
+                x1, y1, w1, h1 = get_aligned_bbox(location)
+                cv2.rectangle(im, (int(x1), int(y1)), (int(x1) + int(w1), int(y1) + int(h1)), colors[key - 1], 5)
+                pred = append_pred(pred, f + 1, key, x1, y1, w1, h1)
+
+            if draw_mask:
+                mask = state['mask'] > state['p'].seg_thr
+                im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
 
 
         cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
 
-        toc += cv2.getTickCount() - tic
+    toc += cv2.getTickCount() - tic
+
 
     pred.to_csv(results_path + 'pred.txt', header=None, index=None, sep=',')
+    df.to_csv('/data/Marina/ob_multi6.txt', header=None, index=None, sep=',')
 
     with open(centroids_path, 'wb') as fil:
         pickle.dump(all_centroids, fil)

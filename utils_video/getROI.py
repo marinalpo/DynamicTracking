@@ -1,6 +1,6 @@
 import cv2
 
-frame_path = '/Users/marinaalonsopoal/Desktop/ants1/images/00000001.jpg'
+frame_path = '/Users/marinaalonsopoal/Desktop/Tracking/Datasets/SMOT/acrobats/img/000035.jpg'
 
 image = cv2.imread(frame_path)
 
