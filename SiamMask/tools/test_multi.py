@@ -252,8 +252,6 @@ def generate_anchor(cfg, score_size):
 
 
 def siamese_init(ob, im, target_pos, target_sz, model, hp=None, device='cpu'):
-
-
     state = dict()
     state['im_h'] = im.shape[0]
     state['im_w'] = im.shape[1]
@@ -284,13 +282,9 @@ def siamese_init(ob, im, target_pos, target_sz, model, hp=None, device='cpu'):
     # print('Sum z crop')
     # print(z_crop.sum())
 
-
     z = Variable(z_crop.unsqueeze(0))
 
-
-
     # La xarxa es guarda les features resultants (self.zf) d'haver passat el patch z per la siamesa
-
     net.template(z.to(device))
 
     if p.windowing == 'cosine':
@@ -317,7 +311,7 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
     window = state['window']
     target_pos = state['target_pos']
     target_sz = state['target_sz']
-    # print(im.shape)
+
     wc_x = target_sz[1] + p.context_amount * sum(target_sz)
     hc_x = target_sz[0] + p.context_amount * sum(target_sz)
     s_x = np.sqrt(wc_x * hc_x)
@@ -336,8 +330,10 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
         # cv2.imwrite('/data/Ponc/tracking/results/windows-seagulls-debug/'+'search_'+str(arrendatario)+'.jpeg', im_debug)
         cv2.waitKey(0)
 
+    print('s_x size:', s_x)
     # extract scaled crops for search region x at previous target position
     x_crop = Variable(get_subwindow_tracking(im, target_pos, p.instance_size, round(s_x), avg_chans).unsqueeze(0))
+    print('xcrop size:', x_crop.shape)
     # In davis we have 5 anchors
     if mask_enable:
         score, delta, mask = net.track_mask(
@@ -345,7 +341,13 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
     else:
         score, delta = net.track(x_crop.to(device))
 
+    # TODO: PRINTING
+    # print('score:')
+    # print(score.shape)
+    # delta: torch.Tensor shape: ([1, 20, 25, 25])
     delta = delta.permute(1, 2, 3, 0).contiguous().view(4, -1).data.cpu().numpy()
+    # delta: numpy.ndarray shape: (4, 3125)
+
 
     # Softmax in 3125,2,which each column is BG, FG
     score = F.softmax(score.permute(1, 2, 3, 0).contiguous().view(2, -1).permute(1, 0), dim=1).data[:,

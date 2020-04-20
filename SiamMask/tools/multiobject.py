@@ -28,7 +28,7 @@ draw_mask = False
 draw_candidates = True
 filter_boxes = False
 bbox_rotated = True
-num_frames = 150  #155
+num_frames = 3  # 155
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
 sequence = 'acrobats'
 video = 'video0'
@@ -41,7 +41,6 @@ title = 'Dataset: ' + dataset + ' Sequence: ' + sequence
 init = pd.read_csv(init_path, sep=',', header=None)
 init.columns = columns_standard
 init = init[init.FrameID < num_frames]
-print(init.head(10))
 
 # TODO: Get the only 10 objects that appear
 pred = init.copy()
@@ -76,11 +75,12 @@ if __name__ == '__main__':
     # Parse Image files
     img_files = sorted(glob.glob(join(img_path, '*.jp*')))[000:num_frames]
     ims = [cv2.imread(imf) for imf in img_files]
-    all_centroids = {}  # Dict that will save all the objects trajectories and discarded candidates
+
+    centroids_dict = {}  # Dict that will save all the objects trajectories and discarded candidates
     objects = {}
 
     for f, im in enumerate(ims):
-        print('Frame:', f)
+        print('------------------------ Frame:', f, '----------------------------')
         im_init = im.copy()
         im_track = im.copy()
 
@@ -105,6 +105,8 @@ if __name__ == '__main__':
                     siammask = load_pretrain(siammask, args.resume)
                 siammask.eval().to(device)
                 tracker[ob] = siammask
+            else:
+                centroids_dict[ob] = []
 
             nested_obj = {'target_pos': np.array([x + w / 2, y + h / 2]), 'target_sz': np.array([w, h]),
                           'init_frame': f, 'siammask': tracker[ob]}
@@ -116,30 +118,34 @@ if __name__ == '__main__':
             cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (255, 255, 0), 5)
             cv2.putText(im, 'init', (int(x), int(y)-7), font, font_size*0.75, (255, 255, 0), 2, cv2.LINE_AA)
 
-
-        print('\nTracking --------------------------------------------------')
         for key, value in objects.items():
+            print('Tracking object', key, ':')
+            centroids = []
             if value['init_frame'] == f:
-                print('Not going to track object ', key, 'at this frame')
+                print('Not going to track object', key, 'at this frame')
                 continue
             frame_boxes = []
-            # state, boxes, rboxes = siamese_track_plus(state=value['state'], im=im_track, mask_enable=True,
-            #                                           refine_enable=True, device=device)
-            state = siamese_track(state=value['state'], im=im_track, mask_enable=True,
+            state, boxes, rboxes = siamese_track_plus(state=value['state'], im=im_track, mask_enable=True,
                                                       refine_enable=True, device=device)
+            # state = siamese_track(state=value['state'], im=im_track, mask_enable=True,
+            #                                           refine_enable=True, device=device)
 
             value['state'] = state
+
             # Filter overlapping boxes
-            # if filter_boxes:
-            #     rboxes = filter_bboxes(rboxes, 10, c=10 * len(rboxes))
-            #
-            # if draw_candidates:
-            #     for box in range(len(rboxes)):
-            #         location = rboxes[box][0].flatten()
-            #         location = np.int0(location).reshape((-1, 1, 2))
-            #         traj = np.average(location, axis=0)[0]
-            #         frame_boxes.append([traj])
-            #         cv2.polylines(im, [location], True, colors[key - 1], 1)
+            if filter_boxes:
+                rboxes = filter_bboxes(rboxes, 10, c=10 * len(rboxes))
+
+            if draw_candidates:
+                for box in range(len(rboxes)):
+                    location = rboxes[box][0].flatten()
+                    location = np.int0(location).reshape((-1, 1, 2))
+                    cent = np.average(location, axis=0)[0]
+                    # print('cent:', cent)
+                    centroids.append([cent])
+                    cv2.polylines(im, [location], True, colors[key - 1], 1)
+
+            centroids_dict[key].append(centroids)
 
             location = value['state']['ploygon'].flatten()
             df = append_pred_single(f, key, location, df)
@@ -166,12 +172,11 @@ if __name__ == '__main__':
 
     toc += cv2.getTickCount() - tic
 
-
     pred.to_csv(results_path + 'pred.txt', header=None, index=None, sep=',')
     df.to_csv('/data/Marina/ob_multi6.txt', header=None, index=None, sep=',')
 
     with open(centroids_path, 'wb') as fil:
-        pickle.dump(all_centroids, fil)
+        pickle.dump(centroids_dict, fil)
 
     toc /= cv2.getTickFrequency()
     fps = f / toc
