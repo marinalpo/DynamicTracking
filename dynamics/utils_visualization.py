@@ -220,10 +220,11 @@ def create_colormap_rgb(num_col, HSV = False):
 
 
 def create_colormap_hsv(num_col):
-    colors = []
+    colors = [(0,0,0)]
     addGrayScale = False
     rounds = 3
-    np.random.seed(2)
+    np.random.seed(3)
+    num_col = num_col - 1
     if num_col <= 8:
         rounds = 1
         div = num_col
@@ -249,6 +250,6 @@ def create_colormap_hsv(num_col):
             color_bgr = color_bgr[0][0]
             color_bgr = [int(cha) for cha in color_bgr]
             colors.append(tuple(color_bgr))
-    colors = colors[0:num_col]
-    np.random.shuffle(colors)
+    colors = colors[0:num_col+1]
+    # np.random.shuffle(colors)
     return colors

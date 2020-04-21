@@ -7,6 +7,7 @@ from __future__ import division
 import argparse
 import logging
 import numpy as np
+import math
 import cv2
 from PIL import Image
 from os import makedirs
@@ -49,6 +50,8 @@ parser.add_argument('--gt', action='store_true', help='whether use gt rect for d
 parser.add_argument('--video', default='', type=str, help='test special video')
 parser.add_argument('--cpu', action='store_true', help='cpu mode')
 parser.add_argument('--debug', action='store_true', help='debug mode')
+
+
 
 
 def append_pred_single(f, ob, location, df):
@@ -158,6 +161,7 @@ def get_subwindow_tracking(im, pos, model_sz, original_sz, avg_chans, out_mode='
     else:
         # print('NO entra if 2')
         im_patch = im_patch_original
+    # np.save('/data/Marina/patch.npy', im_patch)
     return im_to_torch(im_patch) if out_mode in 'torch' else im_patch
 
 
@@ -173,12 +177,12 @@ def compute_intersection_by_pairs(polygons, sorted_scores, intersection_th=0.5):
             if (sorted_scores[i] >= sorted_scores[i + 1]):
                 results.append([polygons[i, :, :], sorted_scores[i]])
             else:
-                results.append([polygons[i + 1, :, :], sorted_scores[i]])
+                results.append([polygons[i + 1, :, :], sorted_scores[i+1]])
         else:
             if (sorted_scores[i] >= sorted_scores[i + 1]):
                 results.append([polygons[i, :, :], sorted_scores[i]])
             else:
-                results.append([polygons[i + 1, :, :], sorted_scores[i]])
+                results.append([polygons[i + 1, :, :], sorted_scores[i+1]])
     return results
 
 
@@ -303,7 +307,7 @@ def siamese_init(ob, im, target_pos, target_sz, model, hp=None, device='cpu'):
     return state, z_crop
 
 
-def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device='cpu', debug=False):
+def siamese_track_plus(state, im, N, mask_enable=False, refine_enable=False, device='cpu', debug=False):
     global arrendatario
     p = state['p']
     net = state['net']
@@ -321,7 +325,7 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
     s_x = s_x + 2 * pad
     crop_box = [target_pos[0] - round(s_x) / 2, target_pos[1] - round(s_x) / 2, round(s_x), round(s_x)]
 
-    debug = True
+    debug = False
     if debug:
         im_debug = im.copy()
         crop_box_int = np.int0(crop_box)
@@ -330,10 +334,9 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
         # cv2.imwrite('/data/Ponc/tracking/results/windows-seagulls-debug/'+'search_'+str(arrendatario)+'.jpeg', im_debug)
         cv2.waitKey(0)
 
-    print('s_x size:', s_x)
     # extract scaled crops for search region x at previous target position
     x_crop = Variable(get_subwindow_tracking(im, target_pos, p.instance_size, round(s_x), avg_chans).unsqueeze(0))
-    print('xcrop size:', x_crop.shape)
+
     # In davis we have 5 anchors
     if mask_enable:
         score, delta, mask = net.track_mask(
@@ -341,15 +344,17 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
     else:
         score, delta = net.track(x_crop.to(device))
 
-    # TODO: PRINTING
-    # print('score:')
-    # print(score.shape)
+    # np.save('/data/Marina/x_crop2.npy', x_crop.data.cpu().numpy())
+    # np.save('/data/Marina/delta.npy', delta.data.cpu().numpy())
+    # np.save('/data/Marina/score.npy', score.data.cpu().numpy())
+
     # delta: torch.Tensor shape: ([1, 20, 25, 25])
     delta = delta.permute(1, 2, 3, 0).contiguous().view(4, -1).data.cpu().numpy()
+    # np.save('/data/Marina/delta2.npy', delta)
     # delta: numpy.ndarray shape: (4, 3125)
 
-
     # Softmax in 3125,2,which each column is BG, FG
+    # Et quedes amb data[1] (el foreground): (3125, )
     score = F.softmax(score.permute(1, 2, 3, 0).contiguous().view(2, -1).permute(1, 0), dim=1).data[:,
             1].cpu().numpy()
 
@@ -357,6 +362,8 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
     delta[1, :] = delta[1, :] * p.anchor[:, 3] + p.anchor[:, 1]
     delta[2, :] = np.exp(delta[2, :]) * p.anchor[:, 2]
     delta[3, :] = np.exp(delta[3, :]) * p.anchor[:, 3]
+
+    np.save('/data/Marina/delta2.npy', delta)
 
     def change(r):
         return np.maximum(r, 1. / r)
@@ -377,19 +384,23 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
     r_c = change((target_sz_in_crop[0] / target_sz_in_crop[1]) / (delta[2, :] / delta[3, :]))  # ratio penalty
 
     penalty = np.exp(-(r_c * s_c - 1) * p.penalty_k)
+    # penalitza si esta mes lluny del centre
     pscore = penalty * score
 
+    # NOTE: Comença la nostre aportació
+
     # cos window (motion model)
-    N = 17
+    # N = 17  # TODO: Passar d'argument
     bboxes = np.zeros((6, N), dtype=np.float64)
     # bboxes has the shape (6 , Npoints) ; 0=res_x, 1=res_y, 2=res_w, 3=res_h, 4=score, 5=best_pscore_id_tmp
     pscore = pscore * (1 - p.window_influence) + window * p.window_influence
     attmap = score.reshape(5, 25, 25)
     attmap = np.amax(attmap, axis=0)
-    # np.save('/data/Ponc/tracking/results/mevasa/'+str(arrendatario)+'.npy', attmap)
+    np.save('/data/Marina/attmap.npy', attmap)
+
     best_score_threshold = 0.99
     for idx in range(0, N):
-        if (idx == 0):
+        if idx == 0:
             best_pscore_id = np.argmax(pscore)
 
         best_pscore_id_tmp = np.argmax(pscore)
@@ -409,25 +420,27 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
         bboxes[1, idx] = target_pos[1]
         bboxes[2, idx] = target_sz[0]
         bboxes[3, idx] = target_sz[1]
-        bboxes[4, idx] = pscore[best_pscore_id_tmp]  # BUG: This should be pscore[best_...]?
+        bboxes[4, idx] = score[best_pscore_id_tmp]  # BUG: This should be pscore[best_...]?
         bboxes[5, idx] = best_pscore_id_tmp
-        if (pscore[best_pscore_id] > best_score_threshold):
-            break
+
+        # if (pscore[best_pscore_id] > best_score_threshold):
+        #     break
         pscore[best_pscore_id_tmp] = 0.0
 
+    # Tot de la millor pscore (la guanyadora original)
     target_pos = np.array([bboxes[0, 0], bboxes[1, 0]])
     target_sz = np.array([bboxes[2, 0], bboxes[3, 0]])
-
     # for Mask Branch
     rboxes = []
     deltas = []
-
+    list_masks = []
     for idx in range(0, N):
         if mask_enable:
             best_pscore_id_mask = np.unravel_index(int(bboxes[5, idx]), (5, p.score_size, p.score_size))
-            delta_x, delta_y = best_pscore_id_mask[2], best_pscore_id_mask[
-                1]  # delta_x and delta_y are the selected coordinates in the volume
+            delta_x, delta_y = best_pscore_id_mask[2], best_pscore_id_mask[1]
+            # delta_x and delta_y are the selected coordinates in the volume
 
+            # NOTE: Nomes agafo boxes de deltes noves, no vull coses de la mateixa delta
             if ((delta_x, delta_y) not in deltas):
                 # print("delta: (", delta_x, ", ", delta_y, ")")
                 deltas.append((delta_x, delta_y))
@@ -458,6 +471,7 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
                 s = p.out_size / sub_box[2]
                 back_box = [-sub_box[0] * s, -sub_box[1] * s, state['im_w'] * s, state['im_h'] * s]
                 mask_in_img = crop_back(mask, back_box, (state['im_w'], state['im_h']))
+                list_masks.append(mask_in_img)
 
                 target_mask = (mask_in_img > p.seg_thr).astype(np.uint8)
                 if cv2.__version__[-5] == '4':
@@ -476,11 +490,11 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
                     box_score = bboxes[4, idx]
                     rboxes.append([rbox_in_img, box_score])
                     # if(len(deltas) == 1):
-                    #     attmap[delta_x, delta_y] = 3.5
+                    #     attmap[delta_x, dhe elta_y] = 3.5
                     # else:
                     #     attmap[delta_x, delta_y] = 1.5
 
-                    if (debug):
+                    if debug:
 
                         im_debug_overlay = im_debug.copy()
                         im_debug_overlay[:, :, :] = np.array([0.0, 0.0, 0.0])
@@ -526,8 +540,8 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
                                             [location[0] + location[2], location[1]],
                                             [location[0] + location[2], location[1] + location[3]],
                                             [location[0], location[1] + location[3]]])
-        if (pscore[best_pscore_id] > best_score_threshold):
-            break
+        # if (pscore[best_pscore_id] > best_score_threshold):
+        #     break
 
     target_pos[0] = max(0, min(state['im_w'], target_pos[0]))
     target_pos[1] = max(0, min(state['im_h'], target_pos[1]))
@@ -535,12 +549,10 @@ def siamese_track_plus(state, im, mask_enable=False, refine_enable=False, device
     target_sz[1] = max(10, min(state['im_h'], target_sz[1]))
     state['target_pos'] = target_pos
     state['target_sz'] = target_sz
-    new_score = bboxes[4, 0]
-    # state['score'] = score[best_pscore_id]
-    state['score'] = new_score
-    state['mask'] = mask_in_img if mask_enable else []
-    state['ploygon'] = rbox_in_img if mask_enable else []
-    return state, bboxes, rboxes
+    state['score'] = bboxes[4, 0]
+    state['mask'] = list_masks[0]
+    state['ploygon'] = rboxes[0][0]
+    return state, list_masks, rboxes
 
 
 def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu', debug=False):
