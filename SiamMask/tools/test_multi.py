@@ -165,40 +165,39 @@ def get_subwindow_tracking(im, pos, model_sz, original_sz, avg_chans, out_mode='
     return im_to_torch(im_patch) if out_mode in 'torch' else im_patch
 
 
+
 def compute_intersection_by_pairs(polygons, sorted_scores, intersection_th=0.5):
     "Computes "
     results = []
     for i in range(polygons.shape[0] // 2):
-        pol_a = asPolygon(polygons[i, :, :])
-        pol_b = asPolygon(polygons[i + 1, :, :])
+        pol_a = asPolygon(polygons[2*i, :, :])
+        pol_b = asPolygon(polygons[2*i + 1, :, :])
         intersection_area = pol_a.intersection(pol_b)
         iou = intersection_area.area / (pol_a.area + pol_b.area)
         if iou >= intersection_th:
-            if (sorted_scores[i] >= sorted_scores[i + 1]):
-                results.append([polygons[i, :, :], sorted_scores[i]])
+            if (sorted_scores[2*i] >= sorted_scores[2*i + 1]):
+                results.append([polygons[2*i, :, :], sorted_scores[2*i]])
             else:
-                results.append([polygons[i + 1, :, :], sorted_scores[i+1]])
+                results.append([polygons[2*i + 1, :, :], sorted_scores[2*i+1]])
         else:
-            if (sorted_scores[i] >= sorted_scores[i + 1]):
-                results.append([polygons[i, :, :], sorted_scores[i]])
-            else:
-                results.append([polygons[i + 1, :, :], sorted_scores[i+1]])
+            results.append([polygons[2*i, :, :], sorted_scores[2*i]])
+            results.append([polygons[2*i + 1, :, :], sorted_scores[2*i+1]])
     return results
 
 
-def filter_bboxes(rboxes, k, c=10):
+
+def filter_bboxes(rboxes, k):
     """
     rboxes: list, contains: [(np.array(polygon), score),(), ... , ()]
     """
+
     num_bxs = len(rboxes)
-    if c == 0:  # Evita bucle infinit
-        return rboxes
+
+    c = 10 * len(rboxes)
     if num_bxs <= 1:
         return rboxes
-    if num_bxs % 2 != 0:
-        # We compare by pairs so we need an odd number of boxes
-        del rboxes[-1]
-        num_bxs = len(rboxes)
+    if num_bxs == k:
+        return rboxes
 
     polygons = np.zeros((num_bxs, 4, 2))  # (num_bxs, 8 (points of a polygon, 2 (coordinates of each point)))
     scores = np.zeros(num_bxs)
@@ -215,24 +214,33 @@ def filter_bboxes(rboxes, k, c=10):
 
     xmax, xmin = centroids_x[-1], centroids_x[0]
     ymax, ymin = centroids_y[-1], centroids_y[0]
-    intersection_th = 0.7  # If 2 boxes overlap more than 0.4 the one with max score will remain
+    intersection_th = 0.25  # If 2 boxes overlap more than 0.4 the one with max score will remain
 
     if ((xmax - xmin) >= (ymax - ymin)):
         # Make pairs according to x axis (indexes_x)
         polygons = polygons[indexes_x]
         sorted_scores = scores[indexes_x]
-        rboxes = compute_intersection_by_pairs(polygons, sorted_scores)
+        rboxes = compute_intersection_by_pairs(polygons, sorted_scores, intersection_th)
     else:
         # Make pairs according to y axis (indexes_y)
         polygons = polygons[indexes_y]
         sorted_scores = scores[indexes_y]
-        rboxes = compute_intersection_by_pairs(polygons, sorted_scores)
-
+        rboxes = compute_intersection_by_pairs(polygons, sorted_scores, intersection_th)
     if (len(rboxes) != 1 and len(rboxes) > k):
         c -= 1
-        rboxes = filter_bboxes(rboxes, k, c)
+        rboxes = filter_bboxes(rboxes, k)
 
     return rboxes
+
+
+def filter_k_boxes(rboxes, k):
+    winner = rboxes[0]
+    rboxes_filt = filter_bboxes(rboxes, k)
+    for i, (box, score) in enumerate(rboxes_filt):
+        if (box == winner[0]).all():
+            del rboxes_filt[i]
+    rboxes_filt.insert(0, list(winner))
+    return rboxes_filt
 
 
 def generate_anchor(cfg, score_size):

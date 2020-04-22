@@ -57,8 +57,7 @@ if __name__ == '__main__':
     
     # Parse Image file
     # img_files = sorted(glob.glob(join(args.base_path, '*.jp*')))[772:805] # NHL
-    img_files = sorted(glob.glob(join(base_path, '*.jp*')))[00:100] # NFL
-    print('img_files:', img_files)
+    img_files = sorted(glob.glob(join(base_path, '*.jp*')))[00:155]
     
     ims = [cv2.imread(imf) for imf in img_files]
     
@@ -71,11 +70,13 @@ if __name__ == '__main__':
         init_rect = (737, 374, 100, 156) # NHL
         init_rect = (1027, 259, 57, 100) # NFL
         init_rect = (932.61, 325.61, 75.932, 143.07)  # Acro4
-        init_rect = (1022.5, 166.25, 102.28, 124.46)  # Acro3
-        init_rect = (75.557, 166.89, 138.81, 87.126)  # Acro1
-        init_rect = (153.03, 366.55, 137.2, 73.815)  # Acro2
-        init_rect = (912.46, 457.04, 89.879, 101.2)  # Acro5
-        ob = 5
+        init_rect = (1022.5, 166.25, 102.28, 124.46)  # Acro3 !
+        # init_rect = (75.557, 166.89, 138.81, 87.126)  # Acro1 !
+        # init_rect = (153.03, 366.55, 137.2, 73.815)  # Acro2
+        # init_rect = (912.46, 457.04, 89.879, 101.2)  # Acro5
+        # reinit_1 = (0.5, 321.78, 81.513, 87.126)
+        reinit_3 = (1109, 377, 165, 78)
+        ob = 3
         x, y, w, h = init_rect
 
     except:
@@ -90,19 +91,37 @@ if __name__ == '__main__':
         tic = cv2.getTickCount()
         frame_boxes = []
         if f == 0:  # init
+            print('INIIIT')
             target_pos = np.array([x + w / 2, y + h / 2])
             target_sz = np.array([w, h])
             state = siamese_init(im, target_pos, target_sz, siammask, cfg['hp'], device=device)  # init tracker
-            cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (0, 255, 0), 5)
-        elif f > 0:  # tracking
+            cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (255, 255, 0), 5)
+
+        if f == 35 and ob == 3:
+            print("REEEEINIIIIT")
+            siammask = Custom(anchors=cfg['anchors'])
+            if args.resume:
+                assert isfile(args.resume), 'Please download {} first.'.format(args.resume)
+                siammask = load_pretrain(siammask, args.resume)
+            siammask.eval().to(device)
+            x, y, w, h = (1109, 377, 165, 78)
+            target_pos = np.array([x + w / 2, y + h / 2])
+            target_sz = np.array([w, h])
+            state = siamese_init(im, target_pos, target_sz, siammask, cfg['hp'], device=device)  # init tracker
+            cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (255, 255, 0), 5)
+
+        # if f == 35 & ob == 3:
+
+        if f > 0 and f != 35:  # tracking
             # state = siamese_init(im, target_pos, target_sz, siammask, cfg['hp'], device=device)
+            print('TRACK')
             state = siamese_track(state, im, mask_enable=True, refine_enable=True, device=device)  # track
             if f == 4:
                 np.save('/data/Marina/mask.npy', state['mask'])
             location = state['ploygon'].flatten()
             mask = state['mask'] > state['p'].seg_thr
             im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
-            laloc = np.int0(location).reshape((-1,1,2))
+            laloc = np.int0(location).reshape((-1, 1, 2))
             traj = np.int0(np.average(laloc, axis=0)[0])
             frame_boxes.append([traj])
             for i in range(laloc.shape[0]):
@@ -113,16 +132,18 @@ if __name__ == '__main__':
             cv2.putText(im,str(state['score']), (50,50), cv2.FONT_HERSHEY_COMPLEX, 1.0, (0,255,0))
             # x1, y1, w1, h1 = get_aligned_bbox(location)
             # cv2.rectangle(im, (int(x1), int(y1)), (int(x1) + int(w1), int(y1) + int(h1)), (0, 255, 0), 5)
-            cv2.imwrite('/data/results2/' + str(f) + '.jpg', im)
+
 
             locations.append(location)
             df = append_pred_single(f, ob, location, df)
+
+        cv2.imwrite('/data/results2/' + str(f).zfill(6) + '.jpg', im)
 
 
         toc += cv2.getTickCount() - tic
 
 
-    df.to_csv('/data/Marina/ob'+str(ob)+'.txt', header=None, index=None, sep=',')
+    df.to_csv('/data/results2/ob'+str(ob)+'.txt', header=None, index=None, sep=',')
 
 
 
