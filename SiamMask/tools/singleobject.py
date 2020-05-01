@@ -39,7 +39,7 @@ if __name__ == '__main__':
     columns_location = ['FrameID', 'ObjectID', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4']
     df = pd.DataFrame(columns=columns_location)
 
-    base_path = '/data/SMOT/acrobats/img/'
+    base_path = '/data/SMOT/juggling/img/'
     # Setup device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     
     # Parse Image file
     # img_files = sorted(glob.glob(join(args.base_path, '*.jp*')))[772:805] # NHL
-    img_files = sorted(glob.glob(join(base_path, '*.jp*')))[00:155]
+    img_files = sorted(glob.glob(join(base_path, '*.jp*')))[00:50]
     
     ims = [cv2.imread(imf) for imf in img_files]
     
@@ -75,7 +75,8 @@ if __name__ == '__main__':
         # init_rect = (153.03, 366.55, 137.2, 73.815)  # Acro2
         # init_rect = (912.46, 457.04, 89.879, 101.2)  # Acro5
         # reinit_1 = (0.5, 321.78, 81.513, 87.126)
-        reinit_3 = (1109, 377, 165, 78)
+        init_rect = (495.49, 331.99, 102.3, 83.496)
+        reinit_3 = (635.68, 575.58, 102.3, 75.947)
         ob = 3
         x, y, w, h = init_rect
 
@@ -97,14 +98,14 @@ if __name__ == '__main__':
             state = siamese_init(im, target_pos, target_sz, siammask, cfg['hp'], device=device)  # init tracker
             cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (255, 255, 0), 5)
 
-        if f == 35 and ob == 3:
+        if f == 20 and ob == 3:
             print("REEEEINIIIIT")
             siammask = Custom(anchors=cfg['anchors'])
             if args.resume:
                 assert isfile(args.resume), 'Please download {} first.'.format(args.resume)
                 siammask = load_pretrain(siammask, args.resume)
             siammask.eval().to(device)
-            x, y, w, h = (1109, 377, 165, 78)
+            x, y, w, h = reinit_3
             target_pos = np.array([x + w / 2, y + h / 2])
             target_sz = np.array([w, h])
             state = siamese_init(im, target_pos, target_sz, siammask, cfg['hp'], device=device)  # init tracker
@@ -112,7 +113,7 @@ if __name__ == '__main__':
 
         # if f == 35 & ob == 3:
 
-        if f > 0 and f != 35:  # tracking
+        if f > 0 and f != 20:  # tracking
             # state = siamese_init(im, target_pos, target_sz, siammask, cfg['hp'], device=device)
             print('TRACK')
             state = siamese_track(state, im, mask_enable=True, refine_enable=True, device=device)  # track

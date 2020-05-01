@@ -18,8 +18,8 @@ coordinate = 0  # coordinate 0: x, 1: y
 
 # Tracker data
 # directory = '/data/Ponc/tracking/centroids_tree_nhl.obj'
-# directory = '/Users/marinaalonsopoal/Desktop/centroids_tree_nhl.obj'
-directory = '/data/Marina/ants1/points/centroids_ants1.obj'
+directory = '/Users/marinaalonsopoal/Desktop/centroids_tree_nhl.obj'
+# directory = '/data/Marina/ants1/points/centroids_ants1.obj'
 
 with open(directory, 'rb') as f:
     data = pkl.load(f)
@@ -27,7 +27,7 @@ with open(directory, 'rb') as f:
 # Bounding Boxes
 
 # Tracker
-tracker = TrackerDynBoxes(T0=T0, T=T, noise=eps, coord=coordinate)
+tracker = TrackerDynBoxes(T0=T0, t=T, noise=eps, coord=coordinate)
 len_output = len(data) - T0 - T + 1  # Smoothing will not affect the length because of the mirroring
 points_tracked_npy = np.zeros((len_output, 2))
 

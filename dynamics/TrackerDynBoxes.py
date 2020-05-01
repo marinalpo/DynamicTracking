@@ -9,7 +9,7 @@ device = torch.device('cpu')
 class TrackerDynBoxes:
     # Generates a candidate sequence given an index
 
-    def __init__(self, T0=7, T=2, noise=0.0001, coord=0):
+    def __init__(self, T0 = 7, T = 2, noise=0.001, coord=0):
         """ Inits TrackerDynBoxes"""
         self.T0 = T0
         self.T = T

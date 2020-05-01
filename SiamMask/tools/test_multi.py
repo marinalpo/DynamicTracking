@@ -83,8 +83,9 @@ def get_paths(dataset, sequence, video='video0'):
 
     results_path = '/data/results/'
     centroids_path = '/data/Marina/centroids/centroids_' + dataset + '_' + sequence + '.obj'
+    locations_path = '/data/Marina/centroids/locations_' + dataset + '_' + sequence + '.obj'
 
-    return img_path, init_path, results_path, centroids_path, dataset
+    return img_path, init_path, results_path, centroids_path, locations_path, dataset
 
 
 def to_torch(ndarray):
@@ -193,7 +194,7 @@ def filter_bboxes(rboxes, k):
 
     num_bxs = len(rboxes)
 
-    c = 10 * len(rboxes)
+    c = 5*len(rboxes)
     if num_bxs <= 1:
         return rboxes
     if num_bxs == k:

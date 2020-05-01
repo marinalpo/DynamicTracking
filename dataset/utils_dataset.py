@@ -3,25 +3,34 @@ import numpy as np
 import pickle as pkl
 
 def create_init(path):
-    columns_standard = ['FrameID', 'ObjectID', 'x_topleft', 'y_topleft', 'Width', 'Height', 'isActive', 'isOccluded']
+    columns_standard = ['FrameID', 'ObjectID', 'x_topleft', 'y_topleft', 'Width', 'Height', 'isActive',
+                        'isOccluded', 'cx', 'cy']
 
     gt = pd.read_csv(path + 'gt.txt', sep=',', header=None)
     gt.columns = columns_standard
+
     list_objectIDs = gt.ObjectID.unique()
 
     for count, o in enumerate(list_objectIDs):
-        obj = gt[(gt.ObjectID == o) & (gt.isActive == 1) & (gt.isOccluded == 0)]
+
+        obj = gt[(gt.ObjectID == o)].reset_index(drop=True)
+        # If isAcvive == -1 -> Object has reappeared
+        dif = obj.diff(periods=-1)
+        reap = obj.iloc[dif[dif.isActive == -1].index + 1]
+
+        obj_first = gt[(gt.ObjectID == o) & (gt.isActive == 1) & (gt.isOccluded == 0)]
+
         if count == 0:
-            init = obj.iloc[0:1]
+            init = obj_first.iloc[0:1]
         else:
-            init = init.append(obj.iloc[0:1])
+            init = init.append(obj_first.iloc[0:1])
+        init = init.append(reap)
 
     # Sort dataframe by FrameID
     init = init.sort_values('FrameID')
 
-    # Save dataframe as .txt
+    # # Save dataframe as .txt
     init.to_csv(path + 'init.txt', header=None, index=None, sep=',')
-    print('init.txt created')
 
 
 def process_GT_MOT(path):
@@ -40,6 +49,10 @@ def process_GT_MOT(path):
 
     # Add zero-valued column for 'isOccluded'
     df_mot['isOccluded'] = 0
+
+    # Add centroids as columns
+    df_mot['cx'] = (df_mot['x_topleft'] + df_mot['Width'] / 2)
+    df_mot['cy'] = (df_mot['y_topleft'] + df_mot['Height'] / 2)
 
     # Save dataframe as .txt
     df_mot.to_csv(path + 'gt.txt', header=None, index=None, sep=',')
@@ -80,6 +93,10 @@ def process_GT_Stanford(path):
 
     # Delete annotations from frames after 400 (there are annotations for 13.334 frames!)
     # df_stan = df_stan[df_stan.FrameID < 400]
+
+    # Add centroids as columns
+    df_stan['cx'] = (df_stan['x_topleft'] + df_stan['Width'] / 2)
+    df_stan['cy'] = (df_stan['y_topleft'] + df_stan['Height'] / 2)
 
     # Save dataframe as .txt
     df_stan.to_csv(path + 'gt.txt', header=None, index=None, sep=',')
@@ -124,7 +141,9 @@ def process_GT_SMOT(path, seq):
     # Add zero-valued column for 'isOccluded'
     df_SMOT['isOccluded'] = 0
 
-    df_SMOT.head(2)
+    # Add centroids as columns
+    df_SMOT['cx'] = (df_SMOT['x_topleft'] + df_SMOT['Width'] / 2)
+    df_SMOT['cy'] = (df_SMOT['y_topleft'] + df_SMOT['Height'] / 2)
 
     # Save dataframe as .txt
     df_SMOT.to_csv(path + 'gt.txt', header=None, index=None, sep=',')
