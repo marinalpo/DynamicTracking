@@ -30,10 +30,11 @@ def compare_dynamics(data_root, data, eps, coord, BS=1):
 
 class TrackerDyn:
 
-    def __init__(self, T0, t=0, noise=0.0001):
+    def __init__(self, T0, t=0, noise=0.0001, metric=1):
         self.T0 = T0
         self.t = t
         self.noise = noise
+        self.metric = metric
         self.buffer_loc = np.zeros([T0, 8])
         self.buffer_centr = np.zeros([T0, 2])
         self.JBLDs = np.zeros(T0)
@@ -56,8 +57,9 @@ class TrackerDyn:
         else:
             data_root = self.buffer_centr[-(self.T0+1):-1, :]
             data = self.buffer_centr[-1, :].reshape(1, 2)
-            jbld = compare_dyn(data_root, data, self.noise, 1)
-            print('jbld:', jbld)
+            # print('data_root', data_root)
+            # print('data', data)
+            jbld = compare_dyn(data_root, data, self.noise, self.metric)
         return jbld.numpy()
 
     # def predict(self):

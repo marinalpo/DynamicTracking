@@ -86,7 +86,6 @@ if __name__ == '__main__':
     img_files = sorted(glob.glob(join(img_path, '*.jp*')))[000:num_frames]
     ims = [cv2.imread(imf) for imf in img_files]
 
-    centroids_dict = {}  # Dict that will save all the objects trajectories and discarded candidates
     locations_dict = {}
     objects = {}
     with torch.no_grad():
@@ -107,12 +106,19 @@ if __name__ == '__main__':
                 if ob in objects:
                     print('Object', ob, ' reinitialized')
                 else:
-                    centroids_dict[ob] = []
                     locations_dict[ob] = []
 
+                x1 = x + w
+                y1 = y + h
+                x2 = x
+                y2 = y + h
+                x3 = x
+                y3 = y
+                x4 = x + w
+                y4 = y
+
                 cx, cy = row['cx'], row['cy']
-                centroids_dict[ob].append([[np.array([cx, cy])]])
-                locations_dict[ob].append([[np.array([0, 0, 0, 0, 0, 0, 0, 0])]])
+                locations_dict[ob].append([[np.array([x1, y1, x2, y2, x3, y3, x4, y4])]])
 
                 nested_obj = {'target_pos': np.array([x + w / 2, y + h / 2]), 'target_sz': np.array([w, h]),
                               'init_frame': f, 'siammask': tracker[ob]}
@@ -148,15 +154,10 @@ if __name__ == '__main__':
 
                 for box in range(len(rboxes)):
                     location = np.int0(rboxes[box][0].flatten()).reshape((-1, 1, 2))
-                    cent = np.average(location, axis=0)[0]
-                    centroids.append([cent])
                     locations.append([rboxes[box][0].flatten()])
                     if draw_candidates:
                         cv2.polylines(im, [location], True, col, 1)
 
-
-
-                centroids_dict[key].append(centroids)
                 locations_dict[key].append(locations)
 
                 # TODO: Decide winner with Dynamics AND UPDATE TRACKER IF REQUIRED
@@ -191,13 +192,9 @@ if __name__ == '__main__':
     a = pred_rot.sum(axis=0, skipna=True).sum()
     # print('Difference when acrobats and num_frames=155:', int(3378487.46 - a))
 
-    with open(centroids_path, 'wb') as fil:
-        pickle.dump(centroids_dict, fil)
-
     with open(locations_path, 'wb') as fil:
         pickle.dump(locations_dict, fil)
 
-    print('centroids path:', centroids_path)
     print('locations path:', locations_path)
 
     toc /= cv2.getTickFrequency()
