@@ -36,19 +36,20 @@ def AR_sequence(a, t_0, l):
 
 
 # Parameters
-dim = 1  # Number of dimensions: dim=2 --> (x, y)
-n = 5  # System memory/order (eq. T0)
-L = 0  # Length of the stitched sequence
-L2 = 2
-var_noise = 1
+dim = 2  # Number of dimensions: dim=2 --> (x, y)
+n = 4  # System memory/order (eq. T0)
+L = 4  # Length of the stitched sequence
+L2 = 5
+var_noise = 0.001
 debug = False
 distance = 0  # ['JBLD', 'JKL']
 
 
 # Generate random coefficients and initial conditions
-maxim = 10
+maxim = 5
+maxim2 = 10
 a1 = np.random.randint(maxim, size=(1, n)) - maxim/2  # Model 1 coefficients
-a2 = np.random.randint(maxim, size=(1, n)) - maxim/2  # Model 2 coefficients
+a2 = np.random.randint(maxim2, size=(1, n)) - maxim2/2  # Model 2 coefficients
 # a2 = 5*np.ones((1, n))
 print('a1:', a1)
 print('a2:', a2)
@@ -70,6 +71,8 @@ z3 = t3 + np.hstack([noise, np.random.normal(0, var_noise, (dim, L2))])
 
 d1_2 = compare_dyn(np.transpose(z1), np.transpose(z2), var_noise, distance)
 d1_3 = compare_dyn(np.transpose(z1), np.transpose(z3), var_noise, distance)
+print('dhigh:', d1_2)
+print('dlow:', d1_3)
 
 if dim == 1:
     plot_AR(n, var_noise, L, L2, z1, z2, z3, t_0, distance, d1_2, d1_3)

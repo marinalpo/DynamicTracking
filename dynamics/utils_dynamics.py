@@ -156,3 +156,17 @@ def compare_dyn(s0, s1, eps, dist):
     elif dist == 1:
         distance = JKL(G, G_s)
     return np.nan_to_num(distance.numpy())
+
+
+def AR_sequence(a, t_0, l):
+    t = t_0
+    n = a.shape[1]
+    dim = t_0.shape[0]
+    for k in range(l):
+        t_k = np.zeros([dim, 1])
+        for d in range(dim):
+            t_dim = t[d, -n:]
+            t_k[d, 0] = np.matmul(a, t_dim)
+        t = np.hstack([t, t_k])
+    return t
+

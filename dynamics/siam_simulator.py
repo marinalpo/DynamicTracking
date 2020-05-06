@@ -16,9 +16,9 @@ with open(locs_pred, 'rb') as f:
 
 # Parameters
 T0 = 4
-eps = 0.001
+eps = 0.0001
 obj = 5
-metric = 1  # if 0: JBLD, if 1: JKL
+metric = 0  # if 0: JBLD, if 1: JKL
 
 metric_name = ['JBLD', 'JKL']
 loc_gt = locs_gt[obj]  # np.ndarray (154, 8)
@@ -43,9 +43,9 @@ for f in range(len(loc)):
     tracker_gt.update(loc_gt[f])
 
 # Plotting
-plot_all_dist(tracker_pred, metric_name[metric], obj, T0, eps)
+# plot_all_dist(tracker_pred, metric_name[metric], obj, T0, eps)
 # plot_centr_and_dist(tracker_pred, tracker_gt, metric_name[metric], obj, T0, eps)
-# plot_all(tracker_pred, tracker_gt, metric_name[metric], obj, T0, eps)
+plot_all(tracker_pred, tracker_gt, metric_name[metric], obj, T0, eps)
 # plot_locs_pred(tracker_gt, tracker_pred)
 # # Find maximum of joint corners
 # a = np.argmax(tracker_pred.dist_loc_joint)
