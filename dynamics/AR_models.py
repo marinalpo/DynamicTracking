@@ -2,20 +2,23 @@ from utils_dynamics import *
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-np.random.seed(2)
+np.random.seed(25)
 
 
-def plot_AR(n, L, L2, z1, z2, z3, t_0):
+def plot_AR(n, var_noise, L, L2, z1, z2, z3, t_0, distance, d2, d3):
+    distance_names = ['JBLD', 'JKL']
+    dist = distance_names[distance]
+    fig, ax = plt.subplots()
     k1 = np.arange(n + L)
     k23 = np.arange(n + L + L2)
-    plt.plot(k1, z1.squeeze(), marker='o', zorder=2, label='z1')
-    plt.plot(k23, z2.squeeze(), marker='o', zorder=1, label='z2')
-    plt.plot(k23, z3.squeeze(), marker='o', zorder=1, label='z3')
-    plt.scatter(np.arange(len(t_0.squeeze())), t_0.squeeze(), c='r', zorder=3, label='t_0')
-    plt.xlabel('k')
-    plt.ylabel('t[k]')
-    plt.legend()
-    plt.title('AR Model of n=' + str(n))
+    ax.plot(k1, z1.squeeze(), marker='o', c='k', zorder=2, label='Root sequence')
+    ax.plot(k23, z2.squeeze(), marker='o', c='orange', zorder=1, label='Different ARM sequence')
+    ax.plot(k23, z3.squeeze(), marker='o', c='g', zorder=1, label='Same ARM sequence')
+    ax.scatter(np.arange(len(t_0.squeeze())), t_0.squeeze(), c='r', zorder=3, label='Initial Conditions')
+    ax.set_xlabel(dist + ' different model: ' + str(np.around(d2, 2)) + '\n' + dist + ' same model: ' + str(np.around(d3, 2)), color='b')
+    ax.set_ylabel('t[k]')
+    ax.legend()
+    ax.set_title('AR Model of n=' + str(n) + ' and noise variance=' + str(var_noise))
     plt.show()
 
 
@@ -34,17 +37,23 @@ def AR_sequence(a, t_0, l):
 
 # Parameters
 dim = 1  # Number of dimensions: dim=2 --> (x, y)
-n = 3  # System memory/order (eq. T0)
-L = 2  # Length of the stitched sequence
-L2 = 5
-var_noise = 0.001
+n = 5  # System memory/order (eq. T0)
+L = 0  # Length of the stitched sequence
+L2 = 2
+var_noise = 1
 debug = False
+distance = 0  # ['JBLD', 'JKL']
+
 
 # Generate random coefficients and initial conditions
-a1 = np.random.randint(5, size=(1, n)) - 2.5  # Model 1 coefficients
-a2 = np.random.randint(5, size=(1, n)) - 2.5  # Model 2 coefficients
-a2 = 2*np.ones((1, n))
-t_0 = np.random.randint(10, size=(dim, n)) - 5  # Initial conditions
+maxim = 10
+a1 = np.random.randint(maxim, size=(1, n)) - maxim/2  # Model 1 coefficients
+a2 = np.random.randint(maxim, size=(1, n)) - maxim/2  # Model 2 coefficients
+# a2 = 5*np.ones((1, n))
+print('a1:', a1)
+print('a2:', a2)
+maxim = 5
+t_0 = np.random.randint(maxim, size=(dim, n)) - maxim/2  # Initial conditions
 
 # Model the system
 t1 = AR_sequence(a1, t_0, L)  # shape: (dim, n+L)
@@ -59,23 +68,11 @@ z1 = t1 + noise
 z2 = t2 + np.hstack([noise, np.random.normal(0, var_noise, (dim, L2))])
 z3 = t3 + np.hstack([noise, np.random.normal(0, var_noise, (dim, L2))])
 
-# print('z1', z1.astype(int))
-# print('z2', z2.astype(int))
-# print('z3:', z3.astype(int))
-
-# Compute Matrices
-# H = Hankel(torch.from_numpy(np.transpose(z)))
-# G = Gram(H, var_noise)
-
-
-d1_2 = compare_dyn(np.transpose(z1), np.transpose(z2), var_noise, 0)
-d1_3 = compare_dyn(np.transpose(z1), np.transpose(z3), var_noise, 0)
-print('dhigh (z2-taronja)', d1_2)
-print('dlow (z3-verd)', d1_3)
+d1_2 = compare_dyn(np.transpose(z1), np.transpose(z2), var_noise, distance)
+d1_3 = compare_dyn(np.transpose(z1), np.transpose(z3), var_noise, distance)
 
 if dim == 1:
-    plot_AR(n, L, L2, z1, z2, z3, t_0)
-    print('t0:', t_0)
+    plot_AR(n, var_noise, L, L2, z1, z2, z3, t_0, distance, d1_2, d1_3)
 
 if debug:
     print('AR Model with dim =', dim, ' and memory n =', n, '\n')
