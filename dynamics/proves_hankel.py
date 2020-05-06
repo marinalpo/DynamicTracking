@@ -5,23 +5,23 @@ import torch
 l0 = 4  # Length of root sequence
 l1 = 2  # Length of sequence to be stitched
 dim = 2
-eps = 0.01
+var_noise = 1
 debug = True
 
 # Create Data
 s0 = np.arange(1, l0 * dim + 1).reshape(l0, dim)  # Root sequence
-s1 = -10*np.arange(l0 * dim + 1, l0 * dim + 1 + l1 * dim).reshape(l1, dim)  # Stitch l1 sequences(s)
+s1 = np.arange(l0 * dim + 1, l0 * dim + 1 + l1 * dim).reshape(l1, dim)  # Stitch l1 sequences(s)
 
 # Compute Hankel and Gram Matrices
 H = Hankel(torch.from_numpy(s0))
-G = Gram(H, eps)
+G = Gram(H, var_noise)
 H_s = Hankel(torch.from_numpy(s0), True, torch.from_numpy(s1))
-G_s = Gram(H_s, eps)
+G_s = Gram(H_s, var_noise)
 
 # Compute JBLD distance
 dist = JBLD(G, G_s)
 dist2 = JKL(G, G_s)
-dist3 = compare_dyn(s0, s1, eps, 0)
+dist3 = compare_dyn(s0, s1, var_noise, 0)
 
 # Predict Hankel
 c_x_pred = predict_Hankel(H)

@@ -52,7 +52,7 @@ def Hankel(s0, stitch=False, s1=0):
     return H
 
 
-def Gram(H, eps):
+def Gram(H, var):
     """ Generates a normalized Gram matrix given the Hankel matrix and a noise factor
     Args:
         - H: Hankel matrix containing temporal information
@@ -60,10 +60,9 @@ def Gram(H, eps):
     Returns:
         - Gnorm: normalized Gram matrix
     """
-    N = np.power(eps, 2) * torch.eye(H.shape[0])
-    G = torch.matmul(H, H.t())
+    N = H.shape[0] * np.power(var, 2) * torch.eye(H.shape[0])
+    G = torch.matmul(H, H.t()) + torch.matmul(N, N.t())
     Gnorm = G/torch.norm(G, 'fro')
-    Gnorm = Gnorm + N
     return Gnorm
 
 
@@ -81,6 +80,7 @@ def JBLD(X, Y, det=True):
         d = (torch.det((X + Y) / 2)) - 0.5 * (torch.det(torch.matmul(X, Y)))
         # print("torch.det((X+Y)) = ", torch.det(X+Y))
     return torch.sqrt(d)
+
 
 def JKL(X, Y):
     """ Computes the Jensen-Bregman LogDet (JBLD) distance between two Gram matrices
@@ -155,4 +155,4 @@ def compare_dyn(s0, s1, eps, dist):
         distance = JBLD(G, G_s)
     elif dist == 1:
         distance = JKL(G, G_s)
-    return distance
+    return np.nan_to_num(distance.numpy())
