@@ -1,8 +1,9 @@
 from utils_dynamics import *
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.io import savemat
 import torch
-np.random.seed(25)
+np.random.seed(1)
 
 
 def plot_AR(n, var_noise, L, L2, z1, z2, z3, t_0, distance, d2, d3):
@@ -36,38 +37,49 @@ def AR_sequence(a, t_0, l):
 
 
 # Parameters
-dim = 2  # Number of dimensions: dim=2 --> (x, y)
+dim = 3  # Number of dimensions: dim=2 --> (x, y)
 n = 4  # System memory/order (eq. T0)
-L = 4  # Length of the stitched sequence
-L2 = 5
+L = 5  # Length of the stitched sequence
+L2 = 3
 var_noise = 0.001
 debug = False
 distance = 0  # ['JBLD', 'JKL']
+a1_max = 1
+a2_max = 1
+t_0_max = 50
 
 
-# Generate random coefficients and initial conditions
-maxim = 5
-maxim2 = 10
-a1 = np.random.randint(maxim, size=(1, n)) - maxim/2  # Model 1 coefficients
-a2 = np.random.randint(maxim2, size=(1, n)) - maxim2/2  # Model 2 coefficients
-# a2 = 5*np.ones((1, n))
-print('a1:', a1)
-print('a2:', a2)
-maxim = 5
-t_0 = np.random.randint(maxim, size=(dim, n)) - maxim/2  # Initial conditions
+# Generate random coefficients and initial condition
+a1 = np.random.randint(2*a1_max, size=(1, n)) - a1_max  # Model 1 coefficients
+a2 = np.random.randint(2*a2_max, size=(1, n)) - a2_max  # Model 2 coefficients
+a2 = 5*np.ones((1, n))
+
+
+
+t_0 = np.random.randint(2*t_0_max, size=(dim, n)) - t_0_max # Initial conditions
+# t_0 = np.ones((dim, n))  # Initial conditions
+
+savemat('/Users/marinaalonsopoal/Documents/MATLAB/AR_Models/data/a1.mat', {'data': a1})
+savemat('/Users/marinaalonsopoal/Documents/MATLAB/AR_Models/data/t_0.mat', {'data': t_0})
 
 # Model the system
 t1 = AR_sequence(a1, t_0, L)  # shape: (dim, n+L)
 t2 = AR_sequence(a2, t1, L2)   # shape: (dim, n+L+L2)
 t3 = AR_sequence(a1, t1, L2)   # shape: (dim, n+L+L2)
 
+print('a1:', a1)
+print('t0:', t_0)
+print('t1:', t1)
+
 # Generate random noise
-noise = np.random.normal(0, var_noise, (dim, n + L))
+n1 = np.random.normal(0, var_noise, (dim, n + L))
+n2 = np.random.normal(0, var_noise, (dim, L2))
+n3 = np.random.normal(0, var_noise, (dim, L2))
 
 # Create measurements
-z1 = t1 + noise
-z2 = t2 + np.hstack([noise, np.random.normal(0, var_noise, (dim, L2))])
-z3 = t3 + np.hstack([noise, np.random.normal(0, var_noise, (dim, L2))])
+z1 = t1 + n1
+z2 = t2 + np.hstack([n1, n2])
+z3 = t3 + np.hstack([n1, n3])
 
 d1_2 = compare_dyn(np.transpose(z1), np.transpose(z2), var_noise, distance)
 d1_3 = compare_dyn(np.transpose(z1), np.transpose(z3), var_noise, distance)

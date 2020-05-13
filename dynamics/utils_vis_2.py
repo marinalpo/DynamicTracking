@@ -61,6 +61,75 @@ def plot_centr_and_dist(tracker_pred, tracker_gt, name, obj, T0, eps):
     plt.show()
 
 
+def plot_centr_pos_and_vel(tracker_pred, tracker_gt, obj, name, T0, eps):
+
+    # Parameters
+    col = ['g', 'm', 'y', 'b', 'r']
+    s_gt = 50
+    s_pred = 25
+
+    # Extract centroids data from GT and Predictions
+    centr_x = tracker_pred.buffer_centr[:, 0]
+    centr_y = tracker_pred.buffer_centr[:, 1]
+    centr_x_vel = tracker_pred.buffer_centr_vel[:, 0]
+    centr_y_vel = tracker_pred.buffer_centr_vel[:, 1]
+
+    centr_x_gt = tracker_gt.buffer_centr[:, 0]
+    centr_y_gt = tracker_gt.buffer_centr[:, 1]
+
+    dist_centr_x = tracker_pred.dist_centr[:, 0]
+    dist_centr_y = tracker_pred.dist_centr[:, 1]
+    dist_centr_x_vel = tracker_pred.dist_centr_vel[:, 0]
+    dist_centr_y_vel = tracker_pred.dist_centr_vel[:, 1]
+
+    frames = np.arange(len(tracker_pred.dist_centr_joint))
+
+    fig, ax = plt.subplots(4, 2)
+    fig.tight_layout()
+
+    fig.suptitle('Object ' + str(obj))
+
+    ax[0, 0].set_title('POSITION Centroid x')
+    ax[0, 0].scatter(frames, centr_x, c='r', s=s_pred, edgecolors='k', alpha=1, label='Predictions')
+    ax[0, 0].scatter(frames, centr_x_gt, c='r', s=s_gt, alpha=0.2, label='GT')
+    ax[0, 0].legend()
+    ax[0, 0].set_ylabel('pixel')
+
+    ax[0, 1].set_title('POSITION Centroid y')
+    ax[0, 1].scatter(frames, centr_y, c='g', s=s_pred, edgecolors='k', alpha=1, label='Predictions')
+    ax[0, 1].scatter(frames, centr_y_gt, c='g', s=s_gt, alpha=0.2, label='GT')
+    ax[0, 1].legend()
+    ax[0, 1].set_ylabel('pixel')
+
+    ax[1, 0].set_title(name + ' distance with T0=' + str(T0) + ' and noise=' + str(eps))
+    ax[1, 1].set_title(name + ' distance with T0=' + str(T0) + ' and noise=' + str(eps))
+    ax[1, 0].plot(frames, dist_centr_x, c='r', alpha=1)
+    ax[1, 1].plot(frames, dist_centr_y, c='g', alpha=1)
+    ax[1, 0].set_ylabel('distance')
+    ax[1, 1].set_ylabel('distance')
+
+    ax[2, 0].set_title('VELOCITY Centroid x')
+    ax[2, 0].scatter(frames, centr_x_vel, c='r', s=s_pred, edgecolors='k', alpha=1)
+    ax[2, 0].plot(frames, centr_x_vel, c='r', alpha=0.2)
+    ax[2, 0].set_ylabel('pixel')
+
+    ax[2, 1].set_title('VELOCITY Centroid y')
+    ax[2, 1].scatter(frames, centr_y_vel, c='g', s=s_pred, edgecolors='k', alpha=1)
+    ax[2, 1].plot(frames, centr_y_vel, c='g', alpha=0.2)
+    ax[2, 1].set_ylabel('pixel')
+
+    ax[3, 0].set_title(name + ' distance with T0=' + str(T0) + ' and noise=' + str(eps))
+    ax[3, 1].set_title(name + ' distance with T0=' + str(T0) + ' and noise=' + str(eps))
+    ax[3, 0].plot(frames, dist_centr_x_vel, c='r', alpha=1)
+    ax[3, 1].plot(frames, dist_centr_y_vel, c='g', alpha=1)
+    ax[3, 0].set_xlabel('frame')
+    ax[3, 1].set_xlabel('frame')
+    ax[3, 0].set_ylabel('distance')
+    ax[3, 1].set_ylabel('distance')
+
+    plt.show()
+
+
 def plot_all(tracker_pred, tracker_gt, name, obj, T0, eps):
 
     locs_gt = tracker_gt.buffer_loc
@@ -112,7 +181,6 @@ def plot_all(tracker_pred, tracker_gt, name, obj, T0, eps):
     ax3 = fig.add_subplot(gs[4:6, 2])
     ax3.plot(frames, tracker_pred.dist_centr[:, 0], c='r', label='coord x')
     ax3.plot(frames, tracker_pred.dist_centr[:, 1], c='g', label='coord y')
-    ax3.plot(frames, tracker_pred.dist_centr_joint, c='k', linewidth=2, label='joint (x,y)')
     ax3.legend()
 
     ax4 = fig.add_subplot(gs[6:8, 2])

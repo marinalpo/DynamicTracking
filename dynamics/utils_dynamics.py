@@ -5,8 +5,8 @@ device = torch.device('cpu')
 
 
 def compute_centroid(loc):
-    centx = int(0.25 * (loc[0] + loc[2] + loc[4] + loc[6]))
-    centy = int(0.25 * (loc[1] + loc[3] + loc[5] + loc[7]))
+    centx = 0.25 * (loc[0] + loc[2] + loc[4] + loc[6])
+    centy = 0.25 * (loc[1] + loc[3] + loc[5] + loc[7])
     return np.array([centx, centy])
 
 
@@ -28,10 +28,12 @@ def Hankel(s0, stitch=False, s1=0):
         l0 = s0.shape[0]
     else:
         l0, dim = s0.shape
+
     if stitch:
         # print('data s1:', s1.shape)
         l1 = s1.shape[0]
         s0 = torch.cat([s0, s1])  # Vertical stack
+
 
     # Compute Hankel dimensions
     if l0 % 2 == 0:  # l is even
@@ -41,6 +43,7 @@ def Hankel(s0, stitch=False, s1=0):
         num_rows = int(torch.ceil(torch.tensor(l0 / 2))) * dim
         num_cols = int(torch.ceil(torch.tensor(l0 / 2))) + l1
     H = torch.zeros([num_rows, num_cols])
+
 
     # Fill Hankel matrix
     for i in range(int(num_rows/dim)):
@@ -74,11 +77,14 @@ def JBLD(X, Y, det=True):
     Returns:
         - d: JBLD distance value between X and Y
     """
-
+    print('primera part: ', torch.log(torch.det((X + Y)/2)))
+    print('primer det:', torch.det((X + Y)/2))
+    print('segona part:', 0.5*torch.log(torch.det(torch.matmul(X, Y))))
+    print('det:',torch.det(torch.matmul(X, Y)))
+    print('prod:', torch.matmul(X, Y))
     d = torch.log(torch.det((X + Y)/2)) - 0.5*torch.log(torch.det(torch.matmul(X, Y)))
     if not det:
         d = (torch.det((X + Y) / 2)) - 0.5 * (torch.det(torch.matmul(X, Y)))
-        # print("torch.det((X+Y)) = ", torch.det(X+Y))
     return torch.sqrt(d)
 
 
