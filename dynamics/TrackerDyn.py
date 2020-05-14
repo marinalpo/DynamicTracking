@@ -8,41 +8,39 @@ device = torch.device('cpu')
 
 class TrackerDyn:
 
-    def __init__(self, T0, W=1, t=0, noise=0.0001, metric=1):
+    def __init__(self, T0, W=1, t=0, noise=0.0001, metric=1, not_GT=True):
         self.T0 = T0
         self.t = t
         self.noise = noise
         self.metric = metric
         self.W = W
+        self.not_GT = not_GT
 
         # Buffers with data
         self.buffer_loc = np.zeros([self.T0, 8])  # 4 corners position: [x1, y1, x2, y2 ...]
         self.buffer_loc_vel = np.zeros([1, 8])  # 4 corners velocity
         self.buffer_centr = np.zeros([self.T0, 2])  # 2 centroids position: [cx, cy]
         self.buffer_centr_vel = np.zeros([1, 2])  # 2 centroids velocity: [cx2-cx1, cy2-cy1]
-        self.buffer_centr_smo = np.zeros([self.W, 2])
+        self.buffer_centr_vel_smo = np.zeros([1, 2])  # 2 centroids velocity: [cx2-cx1, cy2-cy1]
+        self.buffer_centr_smo = np.zeros([1, 2])
 
         # Buffers with distances
-        self.dist_centr = np.zeros([self.T0, 2])  # cx, cy
+        self.dist_centr = np.zeros([self.T0, 2])  # cx, cy - Sliding Window
+        self.dist_centr_smo = np.zeros([self.T0, 2])  # cx, cy - Sliding Window
+        self.dist_centr_smo_2 = np.zeros([self.T0, 2])  # cx, cy - Increasing Window
+        self.dist_centr_2 = np.zeros([self.T0, 2])  # cx, cy - Increasing Window
         self.dist_centr_vel = np.zeros([self.T0, 2])  # cx_vel, cy_vel
-        self.dist_centr_joint = np.zeros(self.T0)
+        self.dist_centr_vel_smo = np.zeros([self.T0, 2])  # cx_vel, cy_vel
+        self.dist_centr_vel_2 = np.zeros([self.T0, 2])  # cx_vel, cy_vel
+        self.dist_centr_joint = np.zeros([self.T0, 1])
+        self.dist_centr_joint_2 = np.zeros([self.T0, 1])
         self.dist_loc = np.zeros([self.T0, 8])  # x1, y1, x2, ...
-        self.dist_loc_joint = np.zeros(self.T0)
+        self.dist_loc_joint = np.zeros([self.T0, 1])
         self.prediction = np.zeros([1, 8])
 
 
-    # def smooth_data(self):
-    #     window = []
-    #     for w in range(-2*self.w, 1):
-    #         if w+tin < 0:
-    #             window.append(data[0])  # Mirroring
-    #         elif w+tin >= len(data):
-    #             window.append(data[-1])  # Mirroring
-    #         else:
-    #             window.append(data[w+tin])
-    #     points = smooth_data(window)
-
     def update(self, loc):
+        # print('self.t', self.t)
         c = compute_centroid(loc)
 
         if self.t > 0:  # Update velocity buffers
@@ -58,49 +56,82 @@ class TrackerDyn:
             c = np.reshape(c, (-1, 2))
             self.buffer_loc = np.vstack((self.buffer_loc, loc))
             self.buffer_centr = np.vstack((self.buffer_centr, c))
-        # if self.t == 55:
-        #     self.predict()
+
+        if self.not_GT:
+            self.update_smooth()
+            if self.t > 0:  # Update velocity buffers
+                self.buffer_centr_vel_smo = np.vstack((self.buffer_centr_vel_smo, self.buffer_centr_smo[self.t, :] -
+                                                       self.buffer_centr_smo[self.t - 1, :]))
+
+            self.update_dist()  # Compute dynamic distances
         self.t += 1
 
-    def dyn_dist(self):
-        if self.t < self.T0 + 1:
-            return 0  #TODO: Break?
+
+    def compute_dist(self, buffer, dist_array, kind, joint):
+        dim = buffer.shape[1]
+        if joint:
+            if kind == 1:  # SLIDING Window
+                data_root = buffer[self.t - self.T0:self.t, :].reshape(self.T0, dim)
+            elif kind == 2:  # INCREASING Window
+                data_root = buffer[0:self.t, :].reshape(self.t, dim)
+            data = np.array([buffer[self.t, :]]).reshape(1, dim)
+            dist = compare_dyn(data_root, data, self.noise)
+            dist_array = np.vstack((dist_array, dist))
         else:
-            # Compute distances for centroids separately
-            dist = np.zeros([1, 2])
-            for d in range(2):
-                data_root = self.buffer_centr[-(self.T0+1):-1, d]
-                data = np.array([self.buffer_centr[-1, d]])
-                dist[0, d] = compare_dyn(data_root, data, self.noise, self.metric)
-            self.dist_centr = np.vstack((self.dist_centr, dist))
+            dist = np.zeros([1, dim])
+            for d in range(dim):
+                if kind == 1:  # SLIDING Window
+                    data_root = buffer[self.t - self.T0:self.t, d].reshape(self.T0, 1)
+                elif kind == 2:  # INCREASING Window
+                    data_root = buffer[0:self.t, d].reshape(self.t, 1)
+                data = np.array([buffer[self.t, d]]).reshape(1, 1)
+                dist[0, d] = compare_dyn(data_root, data, self.noise)
+            dist_array = np.vstack((dist_array, dist))
+        return dist_array
 
-            # NOTE: Distance between centroids velocity
-            dist = np.zeros([1, 2])
-            for d in range(2):
-                data_root = self.buffer_centr_vel[-(self.T0+1):-1, d]
-                data = np.array([self.buffer_centr_vel[-1, d]])
-                dist[0, d] = compare_dyn(data_root, data, self.noise, self.metric)
-            self.dist_centr_vel = np.vstack((self.dist_centr_vel, dist))
 
-            # Compute distances for centroids jointly
-            data_root = self.buffer_centr[-(self.T0 + 1):-1, :]
-            data = self.buffer_centr[-1, :].reshape(1, 2)
-            dist = np.array([compare_dyn(data_root, data, self.noise, self.metric)])
-            self.dist_centr_joint = np.concatenate([self.dist_centr_joint, dist])
 
-            # Compute distances for locations separately
-            dist = np.zeros([1, 8])
-            for d in range(8):
-                data_root = self.buffer_loc[-(self.T0+1):-1, d]
-                data = np.array([self.buffer_loc[-1, d]])
-                dist[0, d] = compare_dyn(data_root, data, self.noise, self.metric)
-            self.dist_loc = np.vstack((self.dist_loc, dist))
+    def update_dist(self):
+        if self.t >= self.T0:
+            self.dist_centr = self.compute_dist(self.buffer_centr, self.dist_centr, 1, False)
+            self.dist_centr_smo = self.compute_dist(self.buffer_centr_smo, self.dist_centr_smo, 1, False)
+            self.dist_centr_smo_2 = self.compute_dist(self.buffer_centr_smo, self.dist_centr_smo_2, 2, False)
 
-            # Compute distances for locations jointly
-            data_root = self.buffer_loc[-(self.T0 + 1):-1, :]
-            data = self.buffer_loc[-1, :].reshape(1, 8)
-            dist = np.array([compare_dyn(data_root, data, self.noise, self.metric)])
-            self.dist_loc_joint = np.concatenate([self.dist_loc_joint, dist])
+
+            self.dist_centr_2 = self.compute_dist(self.buffer_centr, self.dist_centr_2, 2, False)
+            self.dist_centr_vel = self.compute_dist(self.buffer_centr_vel, self.dist_centr_vel, 1, False)
+            self.dist_centr_vel_smo = self.compute_dist(self.buffer_centr_vel_smo, self.dist_centr_vel_smo, 1, False)
+            self.dist_centr_vel_2 = self.compute_dist(self.buffer_centr_vel, self.dist_centr_vel_2, 2, False)
+            self.dist_centr_joint = self.compute_dist(self.buffer_centr, self.dist_centr_joint, 1, True)
+            self.dist_centr_joint_2 = self.compute_dist(self.buffer_centr, self.dist_centr_joint_2, 2, True)
+
+            self.dist_loc = self.compute_dist(self.buffer_loc, self.dist_loc, 1, False)
+            self.dist_loc_joint = self.compute_dist(self.buffer_loc, self.dist_loc_joint, 1, True)
+
+    def update_smooth(self):
+        if self.W == 1:
+            self.buffer_centr_smo = self.buffer_centr
+        else:
+            if self.t == 0:
+                self.buffer_centr_smo = self.buffer_centr[0,:]
+            self.buffer_centr_smo = self.smooth_data(self.buffer_centr, self.buffer_centr_smo)
+
+
+
+    def smooth_data(self, data, smo_array):
+        dim = data.shape[1]  # En el cas dels centroides, 2
+        smo = np.zeros([1, dim])
+        if self.t != 0:
+            for d in range(dim):
+                if self.t >= self.W:
+                    seq = data[self.t-self.W:self.t, d]
+                else:
+                    seq = data[0:self.t, d]
+                smo[0, d] = np.mean(seq)
+            smo_array = np.vstack((smo_array, smo))
+        return smo_array
+
+
 
 
     # def predict(self):
@@ -110,6 +141,5 @@ class TrackerDyn:
     #         H = Hankel(data)
     #         preds[0, d] = predict_Hankel(H)
     #     self.prediction = preds
-    #
-    #
+
 
