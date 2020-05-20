@@ -15,6 +15,7 @@ class TrackerDyn:
         self.metric = metric
         self.W = W
         self.not_GT = not_GT
+        self.th = 0.5
 
         # Buffers with data
         self.buffer_loc = np.zeros([self.T0, 8])  # 4 corners position: [x1, y1, x2, y2 ...]
@@ -38,10 +39,16 @@ class TrackerDyn:
         self.dist_loc_joint = np.zeros([self.T0, 1])
         self.prediction = np.zeros([1, 8])
 
+        # Buffers with flags
+        self.predict_centr_flag = np.zeros([self.T0, 2])
+        self.buffer_pred_centr = np.zeros([self.T0, 2])
+
 
     def update(self, loc):
         # print('self.t', self.t)
+        pred = 0
         c = compute_centroid(loc)
+
 
         if self.t > 0:  # Update velocity buffers
             self.buffer_centr_vel = np.vstack((self.buffer_centr_vel, c - self.buffer_centr[self.t-1, :]))
@@ -64,7 +71,42 @@ class TrackerDyn:
                                                        self.buffer_centr_smo[self.t - 1, :]))
 
             self.update_dist()  # Compute dynamic distances
+        # Classify into predict or not predict
+        # if self.t >= self.T0:
+        #
+        #     self.predict_centr_flag = self.classify_and_predict(self.dist_centr_smo, self.buffer_centr_smo,
+        #                                                         self.predict_centr_flag, self.buffer_pred_centr)
+        # elif self.t == self.T0 - 1:
+        #     self.buffer_pred_centr = self.buffer_centr_smo
+        #     print('')
+
+
         self.t += 1
+        return pred
+
+
+    def classify_and_predict(self, data_dist, data_centr, flag, data_pred):
+
+        # data: (self.t, dim)
+        # flag: (self.t - 1, dim)
+        # Return flag: (self.t, dim)
+        dim = data_dist.shape[1]
+        flag_t = np.zeros((1, dim))
+        pred_t = np.zeros((1, dim))
+        for d in range(dim):
+            if data_dist[self.t, d] >= self.th:
+                print('We are gonna predict bitches!!!!')
+                flag_t[0, d] = 1
+                data_root = data_centr[self.t - self.T0:self.t, d].reshape(self.T0, 1)
+                print('len data root:', data_root.shape)
+                H = Hankel(data_root)
+                pred_t[0, d] = predict_Hankel(H)
+            else:
+                pred_t[0, d] = data_centr[self.t, d]
+
+        data_pred =np.vstack((data_pred, pred_t))
+        flag = np.vstack((flag, flag_t))
+        return flag
 
 
     def compute_dist(self, buffer, dist_array, kind, joint):
@@ -134,12 +176,12 @@ class TrackerDyn:
 
 
 
-    # def predict(self):
-    #     preds = np.zeros([1, 8])
-    #     for d in range(8):
-    #         data = self.buffer_loc[-(self.T0 + 1):-1, d]
-    #         H = Hankel(data)
-    #         preds[0, d] = predict_Hankel(H)
-    #     self.prediction = preds
+    def predict(self):
+        dim = data.shape[1]
+        for d in range(8):
+            data = self.buffer_loc[-(self.T0 + 1):-1, d]
+            H = Hankel(data)
+            preds[0, d] = predict_Hankel(H)
+        self.prediction = preds
 
 

@@ -2,7 +2,7 @@ from utils_dynamics import *
 import numpy as np
 import torch
 
-l0 = 4  # Length of root sequence
+l0 = 11  # Length of root sequence
 l1 = 2  # Length of sequence to be stitched
 dim = 2
 var_noise = 1
@@ -10,10 +10,13 @@ debug = True
 
 # Create Data
 s0 = np.arange(1, l0 * dim + 1).reshape(l0, dim)  # Root sequence
+hi = np.arange(1, T0 * dim + 1).reshape(T0, dim)  # Root sequence
+print('s0:', s0)
 s1 = np.arange(l0 * dim + 1, l0 * dim + 1 + l1 * dim).reshape(l1, dim)  # Stitch l1 sequences(s)
 
 # Compute Hankel and Gram Matrices
 H = Hankel(torch.from_numpy(s0))
+print('H:', H)
 G = Gram(H, var_noise)
 H_s = Hankel(torch.from_numpy(s0), True, torch.from_numpy(s1))
 G_s = Gram(H_s, var_noise)

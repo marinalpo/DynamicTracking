@@ -82,6 +82,19 @@ def plot_centr_pos_and_vel(tracker_pred, tracker_gt, obj, name, T0, eps):
     dist_centr_x_vel = tracker_pred.dist_centr_vel_smo[:, 0]
     dist_centr_y_vel = tracker_pred.dist_centr_vel_smo[:, 1]
 
+    centr_x = tracker_pred.buffer_centr[:, 0]
+    centr_y = tracker_pred.buffer_centr[:, 1]
+    centr_x_vel = tracker_pred.buffer_centr_vel[:, 0]
+    centr_y_vel = tracker_pred.buffer_centr_vel[:, 1]
+
+    centr_x_gt = tracker_gt.buffer_centr[:, 0]
+    centr_y_gt = tracker_gt.buffer_centr[:, 1]
+
+    dist_centr_x = tracker_pred.dist_centr[:, 0]
+    dist_centr_y = tracker_pred.dist_centr[:, 1]
+    dist_centr_x_vel = tracker_pred.dist_centr_vel[:, 0]
+    dist_centr_y_vel = tracker_pred.dist_centr_vel[:, 1]
+
     xmax = max(dist_centr_x)
     xmax_vel = max(dist_centr_x_vel)
     ymax = max(dist_centr_y)
@@ -227,10 +240,12 @@ def plot_locs_pred(tracker_gt, tracker_pred):
     plt.show()
 
 
-def plot_centr_and_jbld(tracker_pred, tracker_gt):
+def plot_centr_and_jbld(tracker_pred, tracker_gt, scores):
     c = tracker_pred.buffer_centr
     c_gt = tracker_gt.buffer_centr
-    jblds = tracker_pred.dist_centr
+    jblds = tracker_pred.dist_centr_smo
+    jblds_vel = tracker_pred.dist_centr_vel_smo
+    jblds_2 = tracker_pred.dist_centr_smo_2
     W = tracker_pred.W
     eps = tracker_pred.noise
     T0 = tracker_pred.T0
@@ -246,6 +261,10 @@ def plot_centr_and_jbld(tracker_pred, tracker_gt):
     centr_y_gt = c_gt[:, 1]
 
     dist_centr_x = jblds[:, 0]
+    dist_centr_x_vel_smo = jblds_vel[:, 0]
+    dist_centr_x = 3*np.power(dist_centr_x, 2) + np.power(dist_centr_x_vel_smo, 2) -1*np.power(scores, 1) - 1 + jblds_2[:, 0]
+    super_threshold_indices = dist_centr_x < 0
+    dist_centr_x[super_threshold_indices] = 0
     dist_centr_y = jblds[:, 1]
     xmax = max(dist_centr_x)
     xmax_pos = dist_centr_x.argmax()
@@ -283,7 +302,7 @@ def plot_centr_and_jbld(tracker_pred, tracker_gt):
     ax[1, 0].set_ylabel('distance')
     ax[1, 1].set_ylabel('distance')
     ax[1, 1].set_ylim([0, tot_max + tot_max * 0.1])
-    ax[1, 0].set_ylim([0, tot_max + tot_max * 0.1])
+    # ax[1, 0].set_ylim([0, tot_max + tot_max * 0.1])
     ax[1, 0].axvline(xmax_pos, c='k', linestyle=':', zorder=2)
     ax[1, 1].axvline(ymax_pos, c='k', linestyle=':', zorder=2)
 
@@ -436,4 +455,74 @@ def plot_centr_and_jbld_3(tracker_pred, tracker_gt):
     ax[2, 1].set_ylabel('distance')
     ax[2, 1].set_ylim([0, tot_max + tot_max * 0.1])
     ax[2, 0].set_ylim([0, tot_max + tot_max * 0.1])
+    plt.show()
+
+
+def plot_centr_and_jbld_4(tracker_pred, tracker_gt, scores):
+    W = tracker_pred.W
+    eps = tracker_pred.noise
+    T0 = tracker_pred.T0
+
+    s_gt = 25
+    s_pred = 25
+
+    # Extract centroids data from GT and Predictions
+    centr_x = tracker_pred.buffer_centr[:, 0]
+    centr_y = tracker_pred.buffer_centr[:, 1]
+
+    centr_x_gt = tracker_gt.buffer_centr[:, 0]
+    centr_y_gt = tracker_gt.buffer_centr[:, 1]
+
+    dist_centr_x = tracker_pred.dist_centr[:, 0]
+    dist_centr_y = tracker_pred.dist_centr[:, 1]
+
+    dist_centr_x_2 = tracker_pred.dist_centr_2[:, 0]
+    dist_centr_y_2 = tracker_pred.dist_centr_2[:, 1]
+
+
+    xmax = max(dist_centr_x)
+    xmax_2 = max(dist_centr_x_2)
+    ymax = max(dist_centr_y)
+    ymax_2 = max(dist_centr_y_2)
+    tot_max = max(xmax, ymax, xmax_2, ymax_2)
+
+    frames = np.arange(len(centr_x))
+
+    fig, ax = plt.subplots(3, 2)
+    fig.tight_layout()
+    ax[0, 1].grid(axis='x', zorder=1, alpha=0.4)
+    ax[1, 1].grid(axis='x', zorder=1, alpha=0.4)
+    ax[0, 0].grid(axis='x', zorder=1, alpha=0.4)
+    ax[1, 0].grid(axis='x', zorder=1, alpha=0.4)
+    ax[2, 1].grid(axis='x', zorder=1, alpha=0.4)
+    ax[2, 0].grid(axis='x', zorder=1, alpha=0.4)
+
+    ax[0, 0].set_title('Position Centroid x')
+    ax[0, 0].scatter(frames, centr_x, c='r', s=s_pred, edgecolors='k', alpha=1, label='Predictions', zorder=3)
+    ax[0, 0].scatter(frames, centr_x_gt, c='r', s=s_gt, alpha=0.2, label='GT', zorder=3)
+    ax[0, 0].legend()
+    ax[0, 0].set_ylabel('pixel')
+
+    ax[0, 1].set_title('Position Centroid y')
+    ax[0, 1].scatter(frames, centr_y, c='g', s=s_pred, edgecolors='k', alpha=1, label='Predictions', zorder=3)
+    ax[0, 1].scatter(frames, centr_y_gt, c='g', s=s_gt, alpha=0.2, label='GT', zorder=3)
+    ax[0, 1].legend()
+    ax[0, 1].set_ylabel('pixel')
+
+    ax[1, 0].set_title('JBLD distance with T0=' + str(T0) + ' and noise=' + str(eps))
+    ax[1, 1].set_title('JBLD distance with T0=' + str(T0) + ' and noise=' + str(eps))
+    ax[1, 0].plot(frames, dist_centr_x, c='r', alpha=1)
+    ax[1, 1].plot(frames, dist_centr_y, c='g', alpha=1)
+    ax[1, 0].set_ylabel('distance')
+    ax[1, 1].set_ylabel('distance')
+    ax[1, 1].set_ylim([0, tot_max + tot_max * 0.1])
+    ax[1, 0].set_ylim([0, tot_max + tot_max * 0.1])
+
+
+    ax[2, 0].set_title('Negative Tracker Score')
+    ax[2, 1].set_title('Negative Tracker Score')
+
+    ax[2, 0].plot(frames, scores, c='k', alpha=1)
+    ax[2, 1].plot(frames, scores, c='k', alpha=1)
+    ax[2, 0].set_ylabel('distance')
     plt.show()

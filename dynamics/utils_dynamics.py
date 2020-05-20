@@ -66,7 +66,11 @@ def Hankel(s0, stitch=False, s1=0):
     # Retrieve sequence's lengths and dimensions
     l1 = 0
     l0, dim = s0.size()
-
+    # print('sequence:', s0)
+    # print('sequence shape:', s0.shape)
+    # print('sequence mean:', torch.mean(s0))
+    # print('new seq:', s0 - torch.mean(s0) )
+    # s0 = s0 - torch.mean(s0)
     if stitch:
         # print('data s1:', s1.shape)
         l1 = s1.size()[0]
@@ -128,6 +132,9 @@ def compare_dyn(s0, s1, eps):
         - dist: scalar distance between sequences
     """
     # Compute Hankel and Gram Matrices
+    mean_root = np.mean(s0)
+    s0 = s0 - mean_root
+    s1 = s1 - mean_root
     H = Hankel(torch.from_numpy(s0))
     G = Gram(H, eps)
     H_s = Hankel(torch.from_numpy(s0), True, torch.from_numpy(s1))

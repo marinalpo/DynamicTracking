@@ -21,13 +21,13 @@ font = cv2.FONT_HERSHEY_SIMPLEX
 font_size = 1
 columns_location = ['FrameID', 'ObjectID', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4']
 dataset_name = ['MOT', 'SMOT', 'Stanford']
-N = 5  # Maximum number of candidates returned by the tracking
+N = 1  # Maximum number of candidates returned by the tracking
 k = 3  # Maximum number of candidates after filtering NMS
 max_num_obj = 10  # Maximum number of objects being tracked
 
 # Parameters
-draw_mask = True
-draw_candidates = True
+draw_mask = False
+draw_candidates = False
 filter_boxes = False
 bbox_rotated = True
 num_frames = 154  # 155 for Acrobats
@@ -66,20 +66,27 @@ if __name__ == '__main__':
     pred_rot = pd.DataFrame(columns=columns_location)
 
     # Setup device and model
-    device = torch.device(3 if torch.cuda.is_available() else 'cpu')
     torch.backends.cudnn.benchmark = True
     cfg = load_config(args)
+    device = 2
+    torch.cuda.set_device(device)
+    # print('CUDA Available:', torch.cuda.device_count())
+    print('CUDA device:', torch.cuda.current_device())
+
 
     # Initialize a SiamMask model for each object ID
     print('Initializing', len(total_obj), 'tracker(s)...')
     tracker = {}
+    scores = {}
     for obj in total_obj:
+
         siammask = Custom(anchors=cfg['anchors'])
         if args.resume:
             assert isfile(args.resume), 'Please download {} first.'.format(args.resume)
             siammask = load_pretrain(siammask, args.resume)
         siammask.eval().to(device)
         tracker[obj] = siammask
+        scores[obj] = []
         print('Tracker:', obj, ' Initialized')
 
     # Parse Image files
@@ -127,6 +134,7 @@ if __name__ == '__main__':
                                         nested_obj['siammask'], cfg['hp'], device=device)
                 nested_obj['state'] = state
                 objects[ob] = nested_obj
+                scores[ob].append(1)
                 cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (255, 255, 0), 5)
                 cv2.putText(im, 'init', (int(x), int(y) - 7), font, font_size * 0.75, (255, 255, 0), 2, cv2.LINE_AA)
 
@@ -142,9 +150,10 @@ if __name__ == '__main__':
                 state, masks, rboxes_track = siamese_track_plus(state=value['state'], im=im_track, N=N,
                                                                 mask_enable=True,
                                                                 refine_enable=True, device=device)
-                # state = siamese_track(state=value['state'], im=im_track, mask_enable=True,
+                # state = siamese_track(state= value['state'], im=im_track, mask_enable=True,
                 #                                           refine_enable=True, device=device)
                 value['state'] = state
+                scores[key].append(state['score'])
 
                 if filter_boxes:  # Filter overlapping boxes
                     rboxes = filter_k_boxes(rboxes_track, k)
@@ -195,7 +204,9 @@ if __name__ == '__main__':
     with open(locations_path, 'wb') as fil:
         pickle.dump(locations_dict, fil)
 
-    print('locations path:', locations_path)
+    with open('/data/Marina/centroids/scores.obj', 'wb') as fil:
+        pickle.dump(scores, fil)
+
 
     toc /= cv2.getTickFrequency()
     fps = f / toc
