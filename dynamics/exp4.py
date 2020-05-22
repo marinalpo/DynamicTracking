@@ -27,33 +27,35 @@ eps = 1
 etas = torch.zeros((T, 2))
 mses = torch.zeros((T, 2))
 
-for t in range(T):  #11
+for t in range(15):  # 11
     print('Frame:', t)
     if t >= T0 - 1:
         for d in range(2):
             data_root = c[t - T0+1:t+1, d]
+            print('data root time:', t, ' dim:', d, ' is:\n', np.around(data_root, 1))
             data_root = torch.from_numpy(data_root)
             data_root = data_root.view(1, len(data_root))
             data_root = data_root - torch.mean(data_root)
             [xhat, eta, mse] = fast_hstln_mo(data_root, R)
             etas[t, d] = torch.norm(eta, 'fro')
             mses[t, d] = mse
+            print('Its mse is:', np.around(mse.numpy(), 4), '\n')
 
 t2 = time()
 total_time = t2 - t1
 print('\nTotal time:', np.around(total_time/60, 1), ' min.\n')
 
-frames = np.arange(T)
-fig, ax = plt.subplots(2, 2)
-ax[0, 0].plot(frames, etas[:, 0], c='r')
-ax[0, 0].set_title('Frobenius norm of Eta in Centroid x')
-
-ax[0, 1].plot(frames, etas[:, 1], c='g')
-ax[0, 1].set_title('Frobenius norm of Eta in Centroid y')
-
-ax[1, 0].plot(frames, mses[:, 0], c='r')
-ax[1, 0].set_title('MSE of Eta in Centroid x')
-
-ax[1, 1].plot(frames, mses[:, 1], c='g')
-ax[1, 1].set_title('MSE of Eta in Centroid y')
-plt.show()
+# frames = np.arange(T)
+# fig, ax = plt.subplots(2, 2)
+# ax[0, 0].plot(frames, etas[:, 0], c='r')
+# ax[0, 0].set_title('Frobenius norm of Eta in Centroid x')
+#
+# ax[0, 1].plot(frames, etas[:, 1], c='g')
+# ax[0, 1].set_title('Frobenius norm of Eta in Centroid y')
+#
+# ax[1, 0].plot(frames, mses[:, 0], c='r')
+# ax[1, 0].set_title('MSE of Eta in Centroid x')
+#
+# ax[1, 1].plot(frames, mses[:, 1], c='g')
+# ax[1, 1].set_title('MSE of Eta in Centroid y')
+# plt.show()

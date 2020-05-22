@@ -1,13 +1,14 @@
+from functools import reduce
+from operator import mul
 import torch
 import numpy as np
 from utils_dynamics import *
 device = torch.device('cpu')
-from torch_utils import *
 
 
-class TrackerDyn:
+class TrackerDyn_all_distances:
 
-    def __init__(self, T0, R=5, W=1, t=0, noise=0.0001, metric=1, not_GT=True, slow=False, norm=True):
+    def __init__(self, T0, W=1, t=0, noise=0.0001, metric=1, not_GT=True):
         self.T0 = T0
         self.t = t
         self.noise = noise
@@ -15,9 +16,6 @@ class TrackerDyn:
         self.W = W
         self.not_GT = not_GT
         self.th = 0.5
-        self.R = R
-        self.slow = slow  # If true: Slow(but Precise), if false: Fast
-        self.norm = norm  # If true: Norm, if false: MSE
 
         # Buffers with data
         self.buffer_loc = np.zeros([self.T0, 8])  # 4 corners position: [x1, y1, x2, y2 ...]
@@ -25,17 +23,25 @@ class TrackerDyn:
         self.buffer_centr = np.zeros([self.T0, 2])  # 2 centroids position: [cx, cy]
         self.buffer_centr_vel = np.zeros([1, 2])  # 2 centroids velocity: [cx2-cx1, cy2-cy1]
         self.buffer_centr_vel_smo = np.zeros([1, 2])  # 2 centroids velocity: [cx2-cx1, cy2-cy1]
+        self.buffer_centr_smo = np.zeros([1, 2])
 
-        # Buffers with distances and metrics
+        # Buffers with distances
         self.dist_centr = np.zeros([self.T0, 2])  # cx, cy - Sliding Window
-        self.eta_mse_centr = np.zeros([self.T0-1, 2])
+        self.dist_centr_smo = np.zeros([self.T0, 2])  # cx, cy - Sliding Window
+        self.dist_centr_smo_2 = np.zeros([self.T0, 2])  # cx, cy - Increasing Window
+        self.dist_centr_2 = np.zeros([self.T0, 2])  # cx, cy - Increasing Window
+        self.dist_centr_vel = np.zeros([self.T0, 2])  # cx_vel, cy_vel
+        self.dist_centr_vel_smo = np.zeros([self.T0, 2])  # cx_vel, cy_vel
+        self.dist_centr_vel_2 = np.zeros([self.T0, 2])  # cx_vel, cy_vel
+        self.dist_centr_joint = np.zeros([self.T0, 1])
+        self.dist_centr_joint_2 = np.zeros([self.T0, 1])
+        self.dist_loc = np.zeros([self.T0, 8])  # x1, y1, x2, ...
+        self.dist_loc_joint = np.zeros([self.T0, 1])
         self.prediction = np.zeros([1, 8])
 
         # Buffers with flags
         self.predict_centr_flag = np.zeros([self.T0, 2])
         self.buffer_pred_centr = np.zeros([self.T0, 2])
-
-        self.xhatt = 0
 
 
     def update(self, loc):
@@ -43,10 +49,12 @@ class TrackerDyn:
         pred = 0
         c = compute_centroid(loc)
 
+
         if self.t > 0:  # Update velocity buffers
             self.buffer_centr_vel = np.vstack((self.buffer_centr_vel, c - self.buffer_centr[self.t-1, :]))
             self.buffer_loc_vel = np.vstack((self.buffer_loc_vel, loc - self.buffer_loc[self.t - 1, :]))
 
+        # if self.t <
         if self.t < self.T0:
             self.buffer_loc[self.t, :] = loc
             self.buffer_centr[self.t, :] = c
@@ -58,8 +66,11 @@ class TrackerDyn:
 
         if self.not_GT:
             self.update_smooth()
-            self.update_dist_and_etas()  # Compute dynamic distances
+            if self.t > 0:  # Update velocity buffers
+                self.buffer_centr_vel_smo = np.vstack((self.buffer_centr_vel_smo, self.buffer_centr_smo[self.t, :] -
+                                                       self.buffer_centr_smo[self.t - 1, :]))
 
+            self.update_dist()  # Compute dynamic distances
         # Classify into predict or not predict
         # if self.t >= self.T0:
         #
@@ -69,11 +80,13 @@ class TrackerDyn:
         #     self.buffer_pred_centr = self.buffer_centr_smo
         #     print('')
 
+
         self.t += 1
         return pred
 
 
     def classify_and_predict(self, data_dist, data_centr, flag, data_pred):
+
         # data: (self.t, dim)
         # flag: (self.t - 1, dim)
         # Return flag: (self.t, dim)
@@ -120,30 +133,22 @@ class TrackerDyn:
 
 
 
-    def update_dist_and_etas(self):
+    def update_dist(self):
         if self.t >= self.T0:
             self.dist_centr = self.compute_dist(self.buffer_centr, self.dist_centr, 1, False)
-        if self.t >= self.T0 - 1:
-            mses = np.zeros((1, 2))
-            for d in range(2):
-                data_root = self.buffer_centr[self.t - self.T0 + 1:self.t + 1, d]
-                data_root = torch.from_numpy(data_root)
-                data_root = data_root.view(1, len(data_root))
-                data_root = data_root - torch.mean(data_root)
-                [xhat, eta, mse] = fast_hstln_mo(data_root, self.R, self.slow)
-                if self.t == 36 and d==0:
-                    self.xhatt = xhat.numpy()
-                    print('xhaaaatt:', self.xhatt)
-
-                if self.norm:
-                    mses[0, d] = torch.norm(eta, 'fro').numpy()
-                else:
-                    mses[0, d] = mse.numpy()
-
-            self.eta_mse_centr = np.vstack((self.eta_mse_centr, mses))
+            self.dist_centr_smo = self.compute_dist(self.buffer_centr_smo, self.dist_centr_smo, 1, False)
+            self.dist_centr_smo_2 = self.compute_dist(self.buffer_centr_smo, self.dist_centr_smo_2, 2, False)
 
 
+            self.dist_centr_2 = self.compute_dist(self.buffer_centr, self.dist_centr_2, 2, False)
+            self.dist_centr_vel = self.compute_dist(self.buffer_centr_vel, self.dist_centr_vel, 1, False)
+            self.dist_centr_vel_smo = self.compute_dist(self.buffer_centr_vel_smo, self.dist_centr_vel_smo, 1, False)
+            self.dist_centr_vel_2 = self.compute_dist(self.buffer_centr_vel, self.dist_centr_vel_2, 2, False)
+            self.dist_centr_joint = self.compute_dist(self.buffer_centr, self.dist_centr_joint, 1, True)
+            self.dist_centr_joint_2 = self.compute_dist(self.buffer_centr, self.dist_centr_joint_2, 2, True)
 
+            self.dist_loc = self.compute_dist(self.buffer_loc, self.dist_loc, 1, False)
+            self.dist_loc_joint = self.compute_dist(self.buffer_loc, self.dist_loc_joint, 1, True)
 
     def update_smooth(self):
         if self.W == 1:
@@ -152,6 +157,7 @@ class TrackerDyn:
             if self.t == 0:
                 self.buffer_centr_smo = self.buffer_centr[0,:]
             self.buffer_centr_smo = self.smooth_data(self.buffer_centr, self.buffer_centr_smo)
+
 
 
     def smooth_data(self, data, smo_array):
@@ -168,10 +174,14 @@ class TrackerDyn:
         return smo_array
 
 
-    def predict(self, data, preds):
+
+
+    def predict(self):
         dim = data.shape[1]
         for d in range(8):
             data = self.buffer_loc[-(self.T0 + 1):-1, d]
             H = Hankel(data)
             preds[0, d] = predict_Hankel(H)
         self.prediction = preds
+
+
