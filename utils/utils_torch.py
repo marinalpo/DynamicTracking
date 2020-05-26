@@ -1,13 +1,11 @@
 import torch
 import numpy as np
 from scipy.special import comb
-from utils_dynamics import *
+from utils.utils_dynamics import *
 from mpmath import matrix, qr
 
 torch.set_default_dtype(torch.float64)
 torch.set_printoptions(precision=10)
-
-
 
 
 def exponent_nk(n, K):

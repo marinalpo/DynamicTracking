@@ -1,8 +1,8 @@
 import torch
 import numpy as np
-from utils_dynamics import *
+from utils.utils_dynamics import *
+from utils.utils_torch import *
 device = torch.device('cpu')
-from torch_utils import *
 
 
 class TrackerDyn:
@@ -14,10 +14,14 @@ class TrackerDyn:
         self.metric = metric
         self.W = W
         self.not_GT = not_GT
-        self.th = 0.5
         self.R = R
         self.slow = slow  # If true: Slow(but Precise), if false: Fast
         self.norm = norm  # If true: Norm, if false: MSE
+
+        # Thresholds to base the classification decisions on
+        self.th_jbld = 0.75
+        self.th_eta = 40
+        self.th_score = 0.9
 
         # Buffers with data
         self.buffer_loc = np.zeros([self.T0, 8])  # 4 corners position: [x1, y1, x2, y2 ...]
@@ -28,20 +32,26 @@ class TrackerDyn:
 
         # Buffers with distances and metrics
         self.dist_centr = np.zeros([self.T0, 2])  # cx, cy - Sliding Window
-        self.eta_mse_centr = np.zeros([self.T0-1, 2])
+        self.eta_centr = np.zeros([self.T0 - 1, 2])
         self.prediction = np.zeros([1, 8])
 
         # Buffers with flags
-        self.predict_centr_flag = np.zeros([self.T0, 2])
+        self.predict_flag = np.zeros([self.T0, 2])
         self.buffer_pred_centr = np.zeros([self.T0, 2])
 
         self.xhatt = 0
 
+        # Buffer with scores
+        self.scores = []
+        self.scores_arr = np.asarray(self.scores)
 
-    def update(self, loc):
+
+    def update(self, loc, sco):
         # print('self.t', self.t)
         pred = 0
         c = compute_centroid(loc)
+        self.scores.append(sco)
+        self.scores_arr = np.asarray(self.scores)
 
         if self.t > 0:  # Update velocity buffers
             self.buffer_centr_vel = np.vstack((self.buffer_centr_vel, c - self.buffer_centr[self.t-1, :]))
@@ -60,17 +70,27 @@ class TrackerDyn:
             self.update_smooth()
             self.update_dist_and_etas()  # Compute dynamic distances
 
-        # Classify into predict or not predict
-        # if self.t >= self.T0:
-        #
-        #     self.predict_centr_flag = self.classify_and_predict(self.dist_centr_smo, self.buffer_centr_smo,
-        #                                                         self.predict_centr_flag, self.buffer_pred_centr)
-        # elif self.t == self.T0 - 1:
-        #     self.buffer_pred_centr = self.buffer_centr_smo
-        #     print('')
+        if self.t >= self.T0:
+            c = self.classify()
+            if c:
+                self.predict()
 
         self.t += 1
         return pred
+
+
+    def classify(self):
+        # c: Boolean indicating if prediction must be done (True: Predict)
+        c = False
+        cond_jbld = self.dist_centr[self.t, :].any() >= self.th_jbld
+        cond_eta = self.eta_centr[self.t, :].any() >= self.th_eta
+        cond_score = self.scores_arr[self.t] <= self.th_score
+        if cond_jbld and cond_eta and cond_score:
+            print('Classification = True')
+            c = True
+        # Update classification flag
+        # self.predict_flag =
+        return c
 
 
     def classify_and_predict(self, data_dist, data_centr, flag, data_pred):
@@ -140,7 +160,7 @@ class TrackerDyn:
                 else:
                     mses[0, d] = mse.numpy()
 
-            self.eta_mse_centr = np.vstack((self.eta_mse_centr, mses))
+            self.eta_centr = np.vstack((self.eta_centr, mses))
 
 
 

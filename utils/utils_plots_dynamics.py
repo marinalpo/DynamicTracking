@@ -526,3 +526,74 @@ def plot_centr_and_jbld_4(tracker_pred, tracker_gt, scores):
     ax[2, 1].plot(frames, scores, c='k', alpha=1)
     ax[2, 0].set_ylabel('distance')
     plt.show()
+
+
+def plot_jbld_eta_score(tracker_pred, tracker_gt, obj, norm, slow, tin, tfin):
+    slow_name = ['Fast', 'Slow']
+    norm_name = ['MSE', 'NORM']
+
+    frames = np.arange(tin, tfin)
+    centr_gt = tracker_gt.buffer_centr
+    centr_pred = tracker_pred.buffer_centr
+    etas = tracker_pred.eta_centr
+    jbld = tracker_pred.dist_centr
+    scores = tracker_pred.scores
+
+    max_jbld = np.max(jbld)
+    max_etas = np.max(etas)
+
+    s_gt = 25
+    s_pred = 25
+    s_p = 5
+
+    eps = tracker_pred.noise
+    T0 = tracker_pred.T0
+    R = tracker_pred.R
+
+    fig, ax = plt.subplots(4, 2)
+    fig.tight_layout()
+
+    for i in range(4):
+        for j in range(2):
+            ax[i, j].grid(axis='x', zorder=1, alpha=0.4)
+
+    fig.suptitle('Object:' + str(obj))
+
+    ax[0, 0].set_title('Position Centroid x')
+    ax[0, 0].scatter(frames, centr_pred[:, 0], c='r', s=s_pred, edgecolors='k', alpha=1, label='Predictions', zorder=3)
+    ax[0, 0].scatter(frames, centr_gt[:, 0], c='r', s=s_gt, alpha=0.2, label='GT', zorder=3)
+    ax[0, 0].legend()
+
+    ax[0, 1].set_title('Position Centroid y')
+    ax[0, 1].scatter(frames, centr_pred[:, 1], c='g', s=s_pred, edgecolors='k', alpha=1, label='Predictions', zorder=3)
+    ax[0, 1].scatter(frames, centr_gt[:, 1], c='g', s=s_gt, alpha=0.2, label='GT', zorder=3)
+    ax[0, 1].legend()
+
+    ax[1, 0].plot(frames, jbld[:, 0], c='r')
+    ax[1, 0].set_title('JBLD distance in Centroid x using T0:' + str(T0) + ' and Noise:' + str(eps))
+    ax[1, 0].set_ylim([0, max_jbld + max_jbld * 0.05])
+
+    ax[1, 1].plot(frames, jbld[:, 1], c='g')
+    ax[1, 1].set_title('JBLD distance in Centroid y using T0:' + str(T0) + ' and Noise:' + str(eps))
+    ax[1, 1].set_ylim([0, max_jbld + max_jbld * 0.05])
+
+    ax[2, 0].plot(frames, etas[:, 0], c='r')
+    ax[2, 0].set_title(slow_name[slow] + ' Implementation of ' + norm_name[norm] + ' of Eta in Centroid x '
+                                                                                   'using T0:' + str(
+        T0) + ' and R:' + str(R))
+    ax[2, 0].set_ylim([0, max_etas + max_etas * 0.05])
+
+    ax[2, 1].plot(frames, etas[:, 1], c='g')
+    ax[2, 1].set_title(slow_name[slow] + ' Implementation of ' + norm_name[norm] + ' of Eta in Centroid y '
+                                                                                   'using T0:' + str(
+        T0) + ' and R:' + str(R))
+    ax[2, 1].set_ylim([0, max_etas + max_etas * 0.05])
+
+    ax[3, 0].plot(frames, scores, c='k')
+    ax[3, 0].set_title('Appearance-based tracker negative score (confidence)')
+    ax[3, 1].plot(frames, scores, c='k')
+    ax[3, 1].set_title('Appearance-based tracker negative score (confidence)')
+    ax[3, 0].set_xlabel('frame')
+    ax[3, 1].set_xlabel('frame')
+
+    plt.show()
