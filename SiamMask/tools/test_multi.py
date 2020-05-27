@@ -312,7 +312,7 @@ def siamese_init(ob, im, target_pos, target_sz, model, hp=None, device='cpu'):
     state['window'] = window
     state['target_pos'] = target_pos
     state['target_sz'] = target_sz
-    # print("window = ", state['window'])
+    print("window = ", state['window'])
     return state, z_crop
 
 
