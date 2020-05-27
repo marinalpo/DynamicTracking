@@ -1,3 +1,0 @@
-# DynamicTracking
-
-README Temporal
