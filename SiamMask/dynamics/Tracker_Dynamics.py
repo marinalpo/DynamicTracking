@@ -1,6 +1,4 @@
-from Tracker.utils_dyn.utils_torch import *
-
-device = torch.device('cpu')
+from utils_dyn.utils_torch import *
 
 
 class TrackerDyn:

@@ -6,9 +6,8 @@ import argparse
 import pandas as pd
 import torch
 from tools.test_multi import *
-from Tracker.utils_dyn import get_aligned_bbox
 from custom import Custom
-from dynamics.TrackerDyn import TrackerDyn
+from dynamics.Tracker_Dynamics import TrackerDyn
 
 # Parsing
 parser = argparse.ArgumentParser(description='PyTorch Tracking Demo')
@@ -98,8 +97,8 @@ if __name__ == '__main__':
         siammask.eval().to(device)
         tracker[obj] = siammask
         scores[obj] = []
-        tracker_dyn = TrackerDyn(T0=T0, R=R, W=W, noise=eps, metric=metric, slow=slow, norm=norm)
-        dynamics[obj] = tracker_dyn
+        # tracker_dyn = TrackerDyn(T0=T0, R=R, W=W, noise=eps, metric=metric, slow=slow, norm=norm)
+        # dynamics[obj] = tracker_dyn
         print('Tracker:', obj, ' Initialized')
 
     # Parse Image files
@@ -140,8 +139,9 @@ if __name__ == '__main__':
                 nested_obj = {'target_pos': np.array([x + w / 2, y + h / 2]), 'target_sz': np.array([w, h]),
                               'init_frame': f, 'siammask': tracker[ob]}
 
-                state, z = siamese_init(ob, im_init, nested_obj['target_pos'], nested_obj['target_sz'],
-                                        nested_obj['siammask'], cfg['hp'], device=device)
+                torch.cuda.set_device(device)
+
+                state, z = siamese_init(ob, im_init, nested_obj['target_pos'], nested_obj['target_sz'], nested_obj['siammask'], cfg['hp'], device=device)
                 nested_obj['state'] = state
                 objects[ob] = nested_obj
                 scores[ob].append(1)
@@ -181,10 +181,9 @@ if __name__ == '__main__':
 
 
                 # TODO: Decide winner with Dynamics AND UPDATE TRACKER IF REQUIRED
-                print('state[target_pose]:', state['target_pos'])
-                print('state[target_pose] type:', type(state['target_pos']))
-                print('state[target_pose] shape:', state['target_pos'].shape)
-                print('state[target_sz]:', state['target_sz'])
+                # state[target_pose] and state[target_sz]: are numpy.ndarray of shape (2,)
+
+
 
 
                 win = 0  # At this moment winner is the one that SiamMasks decides
@@ -228,3 +227,6 @@ if __name__ == '__main__':
     fps = f / toc
 
     print('SiamMask Time: {:02.1f}s Speed: {:3.1f}fps)'.format(toc, fps))
+    print('\nResults (frames with bboxes) saved in:', results_path)
+    print('\n')
+

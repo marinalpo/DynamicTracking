@@ -1,8 +1,6 @@
 import torch
 import numpy as np
-device = torch.device('cpu')
-torch.set_default_dtype(torch.float64)
-
+# torch.set_default_dtype(torch.float64)
 
 
 def compute_centroid(loc):
@@ -118,6 +116,7 @@ def JBLD(X, Y):
     Returns:
         - d: JBLD distance value between X and Y
     """
+
     d = torch.sqrt(torch.logdet((X + Y)/2) - 0.5*torch.logdet(torch.matmul(X, Y)))
     return d
 
