@@ -35,7 +35,7 @@ draw_mask = False
 draw_candidates = False
 filter_boxes = False
 bbox_rotated = True
-num_frames = 154  # 155 for Acrobats
+num_frames = 10  # 155 for Acrobats
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
 sequence = 'acrobats'
 video = 'video0'
@@ -217,5 +217,6 @@ if __name__ == '__main__':
     toc /= cv2.getTickFrequency()
     fps = f / toc
 
-    print('SiamMask Time: {:02.1f}s Speed: {:3.1f}fps)'.format(toc, fps))
-    print('results saved in:', results_path)
+    print('\nSiamMask Time: {:02.1f}s Speed: {:3.1f}fps)'.format(toc, fps))
+    print('\nResults (frames with bboxes) saved in:', results_path)
+    print('\n')

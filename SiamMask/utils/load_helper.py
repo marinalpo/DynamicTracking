@@ -15,20 +15,20 @@ def check_keys(model, pretrained_state_dict):
     if len(unused_pretrained_keys) > 0:
         logger.info('[Warning] unused_pretrained_keys: {}'.format(unused_pretrained_keys))
         logger.info('unused checkpoint keys:{}'.format(len(unused_pretrained_keys)))
-    logger.info('used keys:{}'.format(len(used_pretrained_keys)))
+    # logger.info('used keys:{}'.format(len(used_pretrained_keys)))
     assert len(used_pretrained_keys) > 0, 'load NONE from pretrained checkpoint'
     return True
 
 
 def remove_prefix(state_dict, prefix):
     ''' Old style model is stored with all names of parameters share common prefix 'module.' '''
-    logger.info('remove prefix \'{}\''.format(prefix))
+    # logger.info('remove prefix \'{}\''.format(prefix))
     f = lambda x: x.split(prefix, 1)[-1] if x.startswith(prefix) else x
     return {f(key): value for key, value in state_dict.items()}
 
 
 def load_pretrain(model, pretrained_path):
-    logger.info('load pretrained model from {}'.format(pretrained_path))
+    # logger.info('load pretrained model from {}'.format(pretrained_path))
     if not torch.cuda.is_available():
         pretrained_dict = torch.load(pretrained_path, map_location=lambda storage, loc: storage)
     else:

@@ -1,7 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
-device = torch.device('cpu')
 import cv2
 
 def plot_candidates_and_trajectory(data, data_smoothed, points_tracked_npy, T0, T, W, coord):

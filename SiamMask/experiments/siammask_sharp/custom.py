@@ -171,6 +171,7 @@ class Custom(SiamMask):
         return self.refine_model(f, pos)
 
     def template(self, template):
+        print('\n type template:', template.type(), '\n')
         self.zf = self.features(template)
 
     def track(self, search):
