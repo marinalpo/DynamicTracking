@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SshConfigs">
+    <configs>
+      <sshConfig authType="PASSWORD" host="10.90.33.205" id="046e7143-1400-4cd6-8ec5-568e89467c55" port="22" customName="Lambda3" nameFormat="CUSTOM" username="marina" />
+      <sshConfig authType="PASSWORD" host="10.90.33.205" id="d25bb271-da02-43e3-bd1f-8f24d54d3bc2" port="22" customName="Lambda3" nameFormat="CUSTOM" username="marina" />
+    </configs>
+  </component>
+</project>
