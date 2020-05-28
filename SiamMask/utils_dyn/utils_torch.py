@@ -1,8 +1,6 @@
 from scipy.special import comb
 from utils_dyn.utils_dynamics import *
 from mpmath import matrix, qr
-import torch
-import numpy as np
 
 # torch.set_default_dtype(torch.float64)
 # torch.set_printoptions(precision=10)

@@ -294,10 +294,10 @@ def siamese_init(ob, im, target_pos, target_sz, model, hp=None, device='cpu'):
     # print('Sum z crop')
     # print(z_crop.sum())
 
+
     z = Variable(z_crop.unsqueeze(0))
 
     # La xarxa es guarda les features resultants (self.zf) d'haver passat el patch z per la siamesa
-    print('\n type z:', z.type(), '\n')
     net.template(z.to(device))
 
     if p.windowing == 'cosine':
