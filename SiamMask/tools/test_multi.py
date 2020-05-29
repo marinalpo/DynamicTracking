@@ -702,11 +702,15 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
             prbox = cv2.boxPoints(cv2.minAreaRect(polygon))  # Rotated Rectangle
             rbox_in_img = prbox
         else:  # empty mask
+            print('target pos:', target_pos)
+            print('target sz:', target_sz)
             location = cxy_wh_2_rect(target_pos, target_sz)
+            print('location:', location)
             rbox_in_img = np.array([[location[0], location[1]],
                                     [location[0] + location[2], location[1]],
                                     [location[0] + location[2], location[1] + location[3]],
                                     [location[0], location[1] + location[3]]])
+            print('rbox_in_img:', rbox_in_img)
 
     target_pos[0] = max(0, min(state['im_w'], target_pos[0]))
     target_pos[1] = max(0, min(state['im_h'], target_pos[1]))

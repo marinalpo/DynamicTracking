@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 from tools.test_multi import *
 from custom import Custom
+from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
 from dynamics.Tracker_Dynamics import TrackerDyn
 
 # Parsing
@@ -31,7 +32,7 @@ draw_mask = False
 draw_candidates = False
 filter_boxes = False
 bbox_rotated = True
-num_frames = 154  # 155 for Acrobats
+num_frames = 50  # 155 for Acrobats
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
 sequence = 'acrobats'
 video = 'video0'
@@ -61,6 +62,11 @@ def create_init(init_path, num_frames, max_num_obj):
         total_obj = total_obj[:max_num_obj]
         init = init[init['ObjectID'].isin(total_obj)]
     return init, total_obj
+
+def compute_centroid(loc):
+    centx = 0.25 * (loc[0] + loc[2] + loc[4] + loc[6])
+    centy = 0.25 * (loc[1] + loc[3] + loc[5] + loc[7])
+    return np.array([centx, centy])
 
 
 # Loads init file, deletes targets if there are more than max_num_obj in the requested frames
@@ -100,7 +106,8 @@ if __name__ == '__main__':
         print('Tracker:', obj, ' Initialized')
 
     # Parse Image files
-    img_files = sorted(glob.glob(join(img_path, '*.jp*')))[000:num_frames]
+    img_files = sorted(glob.glob(join(img_path, '*.jp*')))[000000:num_frames]
+    # print('imfiles:', img_files)
     ims = [cv2.imread(imf) for imf in img_files]
 
     locations_dict = {}
@@ -111,13 +118,15 @@ if __name__ == '__main__':
     objects = {}
     with torch.no_grad():
         for f, im in enumerate(ims):
+            f = f + 1  # Begins with image 000001.jpg
+            cv2.putText(im, 'Frame: ' + str(f), (10, 60), font, font_size * 0.75, (255, 255, 255), 2, cv2.LINE_AA)
             print('------------------------ Frame:', f, '----------------------------')
             im_init = im.copy()
             im_track = im.copy()
             tic = cv2.getTickCount()
 
             # Get number of objects that are initialized in this frame
-            init_frame = init[init.FrameID == f + 1]
+            init_frame = init[init.FrameID == f]
             for index, row in init_frame.iterrows():
                 ob = int(row['ObjectID'])
                 x, y, w, h = row['x_topleft'], row['y_topleft'], row['Width'], row['Height']
@@ -152,7 +161,7 @@ if __name__ == '__main__':
                 nested_obj['state'] = state
                 objects[ob] = nested_obj
                 cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (255, 255, 0), 5)
-                cv2.putText(im, 'init', (int(x), int(y) - 7), font, font_size * 0.75, (255, 255, 0), 2, cv2.LINE_AA)
+                cv2.putText(im, 'init obj:'+str(ob), (int(x), int(y) - 7), font, font_size * 0.75, (255, 255, 0), 2, cv2.LINE_AA)
 
             for key, value in objects.items():
                 col = colors[np.where(total_obj == key)[0][0]]
@@ -166,73 +175,46 @@ if __name__ == '__main__':
                 state, masks, rboxes_track = siamese_track_plus(state=value['state'], im=im_track, N=N,
                                                                 mask_enable=True,
                                                                 refine_enable=True, device=device)
-                # state = siamese_track(state= value['state'], im=im_track, mask_enable=True,
-                #                                           refine_enable=True, device=device)
 
                 target_sz = state['target_sz']
                 target_pos = state['target_pos']
                 value['state'] = state
 
-                # if filter_boxes:  # Filter overlapping boxes
-                #     rboxes = filter_k_boxes(rboxes_track, k)
-                # else:
-                #     rboxes = rboxes_track
-                #
-                #
-                # for box in range(len(rboxes)):
-                #     location = np.int0(rboxes[box][0].flatten()).reshape((-1, 1, 2))
-                #     locations.append([rboxes[box][0].flatten()])
-                #     if draw_candidates:
-                #         cv2.polylines(im, [location], True, col, 1)
-
                 locations_dict[key].append(locations)
-                # print('APPEND TYPE STATE TARGET SZ', state['target_sz'].shape)
                 target_sz_dict[key].append(target_sz)
                 target_pos_dict[key].append(target_pos)
+
+                # TODO: DRAW
+                location = state['ploygon'].flatten()
+                centroids1 = compute_centroid(location)
+                mask = state['mask'] > state['p'].seg_thr
+                im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
+                cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, col, 3)
+                cv2.circle(im, (int(centroids1[0]), int(centroids1[1])), 3, col, 2)
+
+                location2 = cxy_wh_2_rect(target_pos, target_sz)
+                rbox_in_img = np.array([[location2[0], location2[1]],
+                                        [location2[0] + location2[2], location2[1]],
+                                        [location2[0] + location2[2], location2[1] + location2[3]],
+                                        [location2[0], location2[1] + location2[3]]])
+                location2 = rbox_in_img.flatten()
+
+                cv2.polylines(im, [np.int0(location2).reshape((-1, 1, 2))], True, col, 1)
+                cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, col, 1)
 
 
                 # TODO: Decide winner with Dynamics AND UPDATE TRACKER IF REQUIRED
                 # state[target_pose] and state[target_sz]: are numpy.ndarray of shape (2,)
 
 
-
-                #
-                # if bbox_rotated:
-                #     cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, col, 3)
-                # else:
-                #     # Work with axis-alligned bboxes
-                #     x1, y1, w1, h1 = get_aligned_bbox(location)
-                #     cv2.rectangle(im, (int(x1), int(y1)), (int(x1) + int(w1), int(y1) + int(h1)), col, 5)
-                #     pred_alig = append_pred(pred_alig, f + 1, key, x1, y1, w1, h1)
-
-                # if draw_mask:
-                #     for it, (box, score) in enumerate(rboxes_track):
-                #         if (box == rboxes[win][0]).all():
-                #             win_track = it
-                #             break
-                #     mask = masks[win_track] > state['p'].seg_thr
-                #     im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
-
             cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
 
     toc += cv2.getTickCount() - tic
-
-    # pred_alig.to_csv('/data/results/pred_alig_' + str(num_frames) + '.txt', header=None, index=None, sep=',')
-    # pred_rot.to_csv('/data/results/pred_rot_' + str(num_frames) + '.txt', header=None, index=None, sep=',')
-
-    # a = pred_rot.sum(axis=0, skipna=True).sum()
-    # print('Difference when acrobats and num_frames=155:', int(3378487.46 - a))
 
     positions_path = '/data/Marina/positions/'
 
     print('locations path:', locations_path)
 
-    print('target_sz_dict:')
-    for key, value in target_sz_dict.items():
-        print(key, '->', len(value))
-
-    for key, value in target_pos_dict.items():
-        print(key, '->', len(value))
 
     with open(locations_path, 'wb') as fil:
         pickle.dump(locations_dict, fil)

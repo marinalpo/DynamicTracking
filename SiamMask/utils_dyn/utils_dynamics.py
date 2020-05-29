@@ -1,5 +1,5 @@
-# import torch
-# import numpy as np
+import torch
+import numpy as np
 # torch.set_default_dtype(torch.float64)
 
 
@@ -28,11 +28,9 @@ def predict_Hankel(H):
     Returns:
         - first_term: Predicted value
     """
-    rows, cols = H.size()
     U, S, V = torch.svd(H)
     r = V[:, -1]
-    last_column_of_H = H[-1, :]
-    last_column_of_H = last_column_of_H[1:]
+    last_column_of_H = H[1:, -1]
     first_term = torch.matmul(last_column_of_H, r[:-1])/(-r[-1])
     return first_term
 

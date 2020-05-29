@@ -1,8 +1,8 @@
 import torch
 torch.set_default_dtype(torch.float64)
 import pickle as pkl
-from Tracker.utils_dyn.utils_plots_dynamics import *
-from TrackerDyn import TrackerDyn
+from utils_dyn.utils_plots_dynamics import *
+from Tracker_Dynamics import TrackerDyn
 
 # export PYTHONPATH=''/Users/marinaalonsopoal/PycharmProjects/DynamicTracking/''
 
@@ -36,7 +36,7 @@ T = len(loc)
 # locs_1[1] list(num_candidates for frame 1)
 # locs_1[1][0][0]  np.ndarray (8,)
 tin = 0
-tfin = 60  #len(loc)
+tfin = len(loc)
 
 # NOTE: Al SiamMask anirà al revés: 1. Frame 2. Objecte, però en teoria no afecta
 
