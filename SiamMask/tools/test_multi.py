@@ -263,7 +263,7 @@ def generate_anchor(cfg, score_size):
     return anchor
 
 
-def siamese_init(ob, im, target_pos, target_sz, model, hp=None, device='cpu'):
+def siamese_init(ob, im, target_pos, target_sz, model, hp=None, device='cpu', reInit=False):
     state = dict()
     state['im_h'] = im.shape[0]
     state['im_w'] = im.shape[1]
@@ -298,7 +298,7 @@ def siamese_init(ob, im, target_pos, target_sz, model, hp=None, device='cpu'):
     z = Variable(z_crop.unsqueeze(0))
 
     # La xarxa es guarda les features resultants (self.zf) d'haver passat el patch z per la siamesa
-    net.template(z.to(device))
+    net.template(z.to(device), reInit)
 
     if p.windowing == 'cosine':
         window = np.outer(np.hanning(p.score_size), np.hanning(p.score_size))

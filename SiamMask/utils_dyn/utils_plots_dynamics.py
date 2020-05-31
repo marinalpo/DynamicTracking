@@ -621,7 +621,7 @@ def plot_jbld_eta_score(tracker_pred, tracker_gt, obj, norm, slow, tin, tfin):
     plt.show()
 
 
-def plot_jbld_eta_score_2(tracker, obj, norm, slow, tin, tfin):
+def plot_jbld_eta_score_2(tracker, c_gt, obj, norm, slow, tin, tfin):
     slow_name = ['Fast', 'Slow']
     norm_name = ['MSE', 'NORM']
 
@@ -652,23 +652,23 @@ def plot_jbld_eta_score_2(tracker, obj, norm, slow, tin, tfin):
             ax[i, j].grid(axis='x', zorder=1, alpha=0.4)
 
     fig.suptitle('Object:' + str(obj))
-    print('shape frames:', frames.shape)
-    print(centr_corr[:, 0].shape)
+    # print('shape frames:', frames.shape)
+    # print(centr_corr[:, 0].shape)
 
     ax[0, 0].set_title('Position Centroid x')
     ax[0, 0].scatter(frames, centr_pred[:, 0], c='r', s=s_pred, edgecolors='k', alpha=0.6, label='Predictions',
                      zorder=3)
     ax[0, 0].scatter(frames, centr_corr[:, 0], c='k', s=s_pred, edgecolors='k', alpha=0.6, label='Corrected',
-                     zorder=3)
-    # ax[0, 0].scatter(frames, centr_gt[:, 0], c='r', s=s_gt, alpha=0.2, label='GT', zorder=3)
+                     zorder=2)
+    ax[0, 0].scatter(frames, c_gt[:, 0], c='r', s=s_gt, alpha=0.2, label='GT', zorder=3)
     ax[0, 0].legend()
 
     ax[0, 1].set_title('Position Centroid y')
-    ax[0, 1].scatter(frames, centr_pred[:, 1], c='g', s=s_pred, edgecolors='k', alpha=1, label='Predictions',
+    ax[0, 1].scatter(frames, centr_pred[:, 1], c='g', s=s_pred, edgecolors='k', alpha=0.6, label='Predictions',
                      zorder=3)
     ax[0, 1].scatter(frames, centr_corr[:, 1], c='k', s=s_pred, edgecolors='k', alpha=0.6, label='Corrected',
-                     zorder=3)
-    # ax[0, 1].scatter(frames, centr_gt[:, 1], c='g', s=s_gt, alpha=0.2, label='GT', zorder=3)
+                     zorder=2)
+    ax[0, 1].scatter(frames, c_gt[:, 1], c='g', s=s_gt, alpha=0.2, label='GT', zorder=3)
     # ax[0, 1].scatter(tfin, pred[0, 1], c='k')
     ax[0, 1].legend()
 
@@ -704,22 +704,25 @@ def plot_jbld_eta_score_2(tracker, obj, norm, slow, tin, tfin):
     ax[3, 0].plot(frames, scores, c='k')
     ax[3, 0].set_title('Appearance-based tracker score (confidence)')
     ax[3, 0].axhline(tracker.th_score, linestyle=':', color='k', alpha=0.5)
+    ax[3, 0].axhline(tracker.th_score_min, linestyle=':', color='k', alpha=0.5)
     ax[3, 0].set_xlabel('frame')
 
     ax[3, 1].plot(frames, scores, c='k')
     ax[3, 1].set_title('Appearance-based tracker score (confidence)')
     ax[3, 1].axhline(tracker.th_score, linestyle=':', color='k', alpha=0.5)
+    ax[3, 1].axhline(tracker.th_score_min, linestyle=':', color='k', alpha=0.5)
     ax[3, 1].set_xlabel('frame')
 
-    flag = tracker.predict_flag
-    for f in range(flag.shape[0]):
-        if flag[f, 0] == 1:
-            for i in range(4):
-                for j in range(2):
+    flags = tracker.predict_flag
+
+    for f, flag in enumerate(flags):
+        for d in range(2):
+            if flag[d]:
+                for i in range(4):
                     if i == 0:
                         a = 1
                     else:
                         a = 0.4
-                    ax[i, j].axvline(f+1, color=(1, 0.8, 0), alpha=a, zorder=1)
+                    ax[i, d].axvline(f+1, color=(1, 0.8, 0), alpha=a, zorder=1)
 
     plt.show()

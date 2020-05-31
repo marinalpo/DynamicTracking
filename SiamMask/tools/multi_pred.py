@@ -8,7 +8,7 @@ import torch
 from tools.test_multi import *
 from custom import Custom
 from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
-from dynamics.Tracker_Dynamics import TrackerDyn
+from dynamics.Tracker_Dynamics_2 import TrackerDyn_2
 
 # Parsing
 parser = argparse.ArgumentParser(description='PyTorch Tracking Demo')
@@ -32,7 +32,7 @@ draw_mask = False
 draw_candidates = False
 filter_boxes = False
 bbox_rotated = True
-num_frames = 50  # 155 for Acrobats
+num_frames = 150  # 155 for Acrobats
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
 sequence = 'acrobats'
 video = 'video0'
@@ -49,7 +49,7 @@ norm = True  # If true: Norm, if false: MSE
 print('\nDataset:', dataset_name[dataset], ' Sequence:', sequence, ' Number of frames:', num_frames)
 
 img_path, init_path, results_path, centroids_path, locations_path, dataset = get_paths(dataset, sequence, video)
-
+init_path = '/data/Marina/init_4.txt'
 
 def create_init(init_path, num_frames, max_num_obj):
     columns_standard = ['FrameID', 'ObjectID', 'x_topleft', 'y_topleft', 'Width', 'Height', 'isActive',
@@ -101,8 +101,7 @@ if __name__ == '__main__':
             siammask = load_pretrain(siammask, args.resume)
         siammask.eval().to(device)
         tracker[obj] = siammask
-        # tracker_dyn = TrackerDyn(T0=T0, R=R, W=W, noise=eps, metric=metric, slow=slow, norm=norm)
-        # dynamics[obj] = tracker_dyn
+
         print('Tracker:', obj, ' Initialized')
 
     # Parse Image files
@@ -129,6 +128,8 @@ if __name__ == '__main__':
             init_frame = init[init.FrameID == f]
             for index, row in init_frame.iterrows():
                 ob = int(row['ObjectID'])
+                tracker_dyn = TrackerDyn_2(T0=T0, R=R, W=W, t=f, noise=eps, metric=metric, slow=slow, norm=norm)
+
                 x, y, w, h = row['x_topleft'], row['y_topleft'], row['Width'], row['Height']
                 if ob in objects:
                     print('Object', ob, ' reinitialized')
@@ -151,11 +152,15 @@ if __name__ == '__main__':
                 target_sz_dict[ob].append(np.array([w, h]))
                 # print('INIIIIIIIIT APPEND TYPE STATE TARGET SZ', np.array([w, h]).shape)
                 target_pos_dict[ob].append(np.array([x + w / 2, y + h / 2]))
+                target_pos = np.array([x + w / 2, y + h / 2])
+                target_sz = np.array([w, h])
 
-                nested_obj = {'target_pos': np.array([x + w / 2, y + h / 2]), 'target_sz': np.array([w, h]),
+                nested_obj = {'target_pos': target_pos, 'target_sz': np.array([w, h]),
                               'init_frame': f, 'siammask': tracker[ob]}
 
                 torch.cuda.set_device(device)
+                c, pred_pos = tracker_dyn.update(target_pos, target_sz, 1)
+                dynamics[ob] = tracker_dyn
 
                 state, z = siamese_init(ob, im_init, nested_obj['target_pos'], nested_obj['target_sz'], nested_obj['siammask'], cfg['hp'], device=device)
                 nested_obj['state'] = state
@@ -172,12 +177,18 @@ if __name__ == '__main__':
                     print('Not going to track object', key, 'at this frame')
                     continue
                 frame_boxes = []
+                state = value['state']
+                print('target pos before:', state['target_pos'])
+                print('target sz before:', state['target_sz'])
                 state, masks, rboxes_track = siamese_track_plus(state=value['state'], im=im_track, N=N,
                                                                 mask_enable=True,
                                                                 refine_enable=True, device=device)
 
                 target_sz = state['target_sz']
                 target_pos = state['target_pos']
+
+
+                score = state['score']
                 value['state'] = state
 
                 locations_dict[key].append(locations)
@@ -204,7 +215,38 @@ if __name__ == '__main__':
 
 
                 # TODO: Decide winner with Dynamics AND UPDATE TRACKER IF REQUIRED
+                # tracker = dynamics[key]
+                # c, pred_pos = tracker.update(target_pos, target_sz, score)
+                # state['target_pos'] = pred_pos
+
+                print('target pos after:', state['target_pos'])
+                if f == 57:
+                    target_pos = np.array([593, 437])
+                    target_sz = np.array([45, 95])
+
+                    # if c[0] or c[1]:
+                    cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, (0, 254, 254), 3)
+                    location2 = cxy_wh_2_rect(target_pos, target_sz)
+                    rbox_in_img = np.array([[location2[0], location2[1]],
+                                            [location2[0] + location2[2], location2[1]],
+                                            [location2[0] + location2[2], location2[1] + location2[3]],
+                                            [location2[0], location2[1] + location2[3]]])
+                    location2 = rbox_in_img.flatten()
+                    cv2.polylines(im, [np.int0(location2).reshape((-1, 1, 2))], True, (0, 254, 254), 3)
+
                 # state[target_pose] and state[target_sz]: are numpy.ndarray of shape (2,)
+                    state['target_pos'] = target_pos
+                    state['target_sz'] = target_sz
+                    # siammask = Custom(anchors=cfg['anchors'])
+                    # if args.resume:
+                    #     assert isfile(args.resume), 'Please download {} first.'.format(args.resume)
+                    #     siammask = load_pretrain(siammask, args.resume)
+                    # siammask.eval().to(device)
+                    # value['siammask'] = siammask
+                    # state, z = siamese_init(key, im, target_pos, target_sz,
+                    #                         value['siammask'], cfg['hp'], device=device, reInit=True)
+
+                value['state'] = state
 
 
             cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
@@ -212,18 +254,18 @@ if __name__ == '__main__':
     toc += cv2.getTickCount() - tic
 
     positions_path = '/data/Marina/positions/'
-
-    print('locations path:', locations_path)
+    #
+    # print('locations path:', locations_path)
 
 
     with open(locations_path, 'wb') as fil:
         pickle.dump(locations_dict, fil)
 
-    with open(positions_path+'target_sz_dict.obj', 'wb') as fil:
-        pickle.dump(target_sz_dict, fil)
-
-    with open(positions_path+'target_pos_dict.obj', 'wb') as fil:
-        pickle.dump(target_pos_dict, fil)
+    # with open(positions_path+'target_sz_dict.obj', 'wb') as fil:
+    #     pickle.dump(target_sz_dict, fil)
+    #
+    # with open(positions_path+'target_pos_dict.obj', 'wb') as fil:
+    #     pickle.dump(target_pos_dict, fil)
 
 
     toc /= cv2.getTickFrequency()

@@ -1,8 +1,8 @@
 from scipy.special import comb
-# from utils_dyn.utils_dynamics import *
+from utils_dyn.utils_dynamics import *
 from mpmath import matrix, qr
 
-from SiamMask.utils_dyn.utils_dynamics import *
+# from SiamMask.utils_dyn.utils_dynamics import *
 
 # torch.set_default_dtype(torch.float64)
 # torch.set_printoptions(precision=10)
@@ -130,6 +130,7 @@ def fast_hstln_mo(u, R, slow):
 
     # Replace missing values with mean of the data
     mu = torch.sum(u) / torch.sum(omega)
+    u = u.type(torch.float)
     u = u + (mu * torch.ones((1, N_u))) * (torch.zeros((D_u, N_u)))
 
     Ab = Hankel(torch.transpose(u, 0, 1))  # Hankel matrix (hr, hc)

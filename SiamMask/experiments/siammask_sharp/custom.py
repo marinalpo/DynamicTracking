@@ -170,9 +170,16 @@ class Custom(SiamMask):
     def refine(self, f, pos=None):
         return self.refine_model(f, pos)
 
-    def template(self, template):
-        print('\n type template:', template.type(), '\n')
-        self.zf = self.features(template)
+    def template(self, template, reInit):
+        # template.type() torch.cuda.FloatTensor
+        print('\n Update template\n')
+        alpha = 0.9
+        if reInit:
+            self.zf = alpha * self.features(template) + (1-alpha)*self.zf
+        else:
+            self.zf = self.features(template)
+            # self.aux = self..clone()
+
 
     def track(self, search):
         search = self.features(search)

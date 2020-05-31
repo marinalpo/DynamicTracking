@@ -22,7 +22,7 @@ with open(scores, 'rb') as f:
 T0 = 11  # System memory
 R = 5
 eps = 1  # Noise variance
-obj = 2
+obj = 5
 metric = 0  # if 0: JBLD, if 1: JKL
 W = 3  # Smoothing window length
 slow = False  # If true: Slow(but Precise), if false: Fast
@@ -50,7 +50,9 @@ for f in range(tin, tfin):  # T
     tracker_pred.update(loca, scores[f])
     tracker_gt.update(loc_gt[f], scores[f])
 
+c = tracker_gt.buffer_centr
+np.save('/Users/marinaalonsopoal/Desktop/Objects/centr_gt_'+str(obj), c)
 
-plot_jbld_eta_score(tracker_pred, tracker_gt, obj, norm, slow, tin, tfin)
-
-
+# plot_jbld_eta_score(tracker_pred, tracker_gt, obj, norm, slow, tin, tfin)
+#
+#

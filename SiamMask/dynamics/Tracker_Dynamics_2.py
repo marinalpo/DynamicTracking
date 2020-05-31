@@ -2,7 +2,10 @@
 import numpy as np
 import torch
 
-from SiamMask.utils_dyn.utils_torch import *
+from utils_dyn.utils_torch import *
+
+#
+# from SiamMask.utils_dyn.utils_torch import *
 
 
 class TrackerDyn_2:
@@ -21,9 +24,10 @@ class TrackerDyn_2:
 
         # Thresholds to base the classification decisions on
         self.th_jbld = 0.5  # 0.3
-        self.th_jbld_max = 1
-        self.th_eta = 20  # 15
+        self.th_jbld_max = 1  # 1
+        self.th_eta = 15  # 15
         self.th_score = 0.97
+        self.th_score_min = 0.9
 
         # Buffers with data
         self.buffer_pos = np.zeros([self.T0, 2])
@@ -37,18 +41,19 @@ class TrackerDyn_2:
         self.eta_pos = np.zeros([self.T0 - 1, 2])
 
         # Buffers with flags
-        self.predict_flag = [0]*self.T0
+        self.predict_flag = [[False, False]] * self.T0
         self.buffer_pred_centr = np.zeros([self.T0, 2])
 
-        self.xhat_list = [0]*(self.T0-1)
+        self.xhat_list = [0] * (self.T0 - 1)
 
         # Buffer with scores
         self.scores = []
         self.scores_arr = np.asarray(self.scores)
 
     def update(self, pos, sz, sco):
-        pred_pos = 0
-        c = False
+        pred_pos = pos
+
+        c = [False, False]
 
         # Fill buffers with incoming data
         self.scores.append(sco)
@@ -58,9 +63,9 @@ class TrackerDyn_2:
             self.buffer_pos_corr[self.t - 1, :] = np.reshape(pos, (1, 2))
             self.buffer_sz[self.t - 1, :] = np.reshape(sz, (1, 2))
         else:
-            self.buffer_pos = np.vstack((self.buffer_pos,  np.reshape(pos, (1, 2))))
+            self.buffer_pos = np.vstack((self.buffer_pos, np.reshape(pos, (1, 2))))
             self.buffer_pos_corr = np.vstack((self.buffer_pos_corr, np.reshape(pos, (1, 2))))
-            self.buffer_sz = np.vstack((self.buffer_sz,  np.reshape(sz, (1, 2))))
+            self.buffer_sz = np.vstack((self.buffer_sz, np.reshape(sz, (1, 2))))
 
         # Compute distances, etas, classify and predict
         if self.t >= self.T0:
@@ -69,10 +74,15 @@ class TrackerDyn_2:
             if self.t != self.T0:
                 self.dist_pos = self.compute_dist(self.buffer_pos_corr, self.dist_pos, 1, False)
                 c = self.classify()
-                if c.any():
-                    print('Lets predict')
-                    pred_pos = self.predict()
-                    self.buffer_pos_corr[self.t - 1, :] = pred_pos
+                if c[0] or c[1]:
+                    if c[0]:
+                        print('Lets predict x!')
+                        pred_pos[0] = self.predict(0)
+                        self.buffer_pos_corr[self.t - 1, 0] = pred_pos[0]
+                    if c[1]:
+                        print('Lets predict y!')
+                        pred_pos[1] = self.predict(1)
+                        self.buffer_pos_corr[self.t - 1, 1] = pred_pos[1]
 
         self.t += 1
         return c, pred_pos
@@ -81,29 +91,33 @@ class TrackerDyn_2:
         # c: Boolean indicating if prediction must be done (True: Predict)
         c = [False, False]
         for d in range(2):
-            cond_jbld = self.dist_pos[self.t-1, d] >= self.th_jbld
-            cond_eta = self.eta_pos[self.t-1, d] >= self.th_eta
-            cond_score = self.scores_arr[self.t-1] <= self.th_score
+            cond_jbld = self.dist_pos[self.t - 1, d] >= self.th_jbld
+            cond_eta = self.eta_pos[self.t - 1, d] >= self.th_eta
+            cond_score = self.scores_arr[self.t - 1] <= self.th_score
             if cond_jbld and cond_eta and cond_score:
                 c[d] = True
-            cond_jbld = self.dist_pos[self.t-1, d] >= self.th_jbld_max
+            cond_jbld = self.dist_pos[self.t - 1, d] >= self.th_jbld_max
             if cond_jbld:
                 c[d] = True
+            cond_score = self.scores_arr[self.t - 1] <= self.th_score_min
+            if cond_score:
+                c[d] = True
+
         # Update classification flag
         # TODO: Si es vol canviar a que es prediguin els dos fer algo tipo .any()
         self.predict_flag.append(c)
         return c
 
-    def predict(self):
+    def predict(self, coord):
         # xhat: (self.T0, 2)
         # flag: (self.t - 1, dim)
         # Return pred: (self.t, dim)
-        pred = np.zeros((1, 2))
+        # pred = np.zeros((1, 2))
         predict_type = 3  # Predict with data not xhat
         if predict_type == 1:
             for d in range(2):
                 # TODO: POSSAR EL self.buffer_pos_corr
-                data = self.buffer_pos_corr[self.t-self.T0 - 1: self.t - 1, d]
+                data = self.buffer_pos_corr[self.t - self.T0 - 1: self.t - 1, d]
                 # data = self.buffer_pos[self.t - self.T0 - 1: self.t - 1, d]
                 data = torch.from_numpy(data.reshape(self.T0, 1))
                 print('data:', data)
@@ -123,9 +137,11 @@ class TrackerDyn_2:
                 print('pred:', pred[0, d])
         else:
             for d in range(2):
-                data = self.buffer_pos_corr[self.t - self.T0 - 1: self.t - 1, d]
+                d = coord
+                # TODO: POSSAR EL self.buffer_pos_corr
+                data = self.buffer_pos[self.t - self.T0 - 1: self.t - 1, d]
                 diff = data[-1] - data[-2]
-                pred[0, d] = data[-1] + diff*0.8
+                pred = data[-1] + diff
 
         return pred
 
@@ -150,7 +166,6 @@ class TrackerDyn_2:
                 dist[0, d] = compare_dyn(data_root, data, self.noise)
             dist_array = np.vstack((dist_array, dist))
         return dist_array
-
 
     def update_etas(self):
         mses = np.zeros((1, 2))

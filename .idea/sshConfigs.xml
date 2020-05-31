@@ -3,7 +3,7 @@
   <component name="SshConfigs">
     <configs>
       <sshConfig authType="PASSWORD" host="10.90.33.205" id="046e7143-1400-4cd6-8ec5-568e89467c55" port="22" customName="Lambda3" nameFormat="CUSTOM" username="marina" />
-      <sshConfig authType="PASSWORD" host="10.90.33.205" id="291155f0-85ae-4407-a6ff-0530bf3e5146" port="22" customName="Lambda3" nameFormat="CUSTOM" username="marina" />
+      <sshConfig authType="PASSWORD" host="10.90.33.205" id="5fe28161-4857-4166-88c9-135cc3038c85" port="22" customName="Lambda3" nameFormat="CUSTOM" username="marina" />
     </configs>
   </component>
 </project>
