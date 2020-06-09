@@ -112,7 +112,12 @@ def fast_hstln_mo(u, R, slow):
         - x_hat:  AR coefficients  (DxN)
         - eta:  corrections (negative estimated noise) (DxN)
     """
+    torch.set_default_dtype(torch.float64)
     D_u, N_u = u.shape  # Dimension, Length
+
+    # print('type u:', u.type())
+    # u = u.type(torch.DoubleTensor)
+    # print('type u:', u.type())
 
     # Default values
     tol = 1e-7
@@ -126,14 +131,14 @@ def fast_hstln_mo(u, R, slow):
     nr = (N_u - nc + 1) * D_u
 
     hi = np.arange(1, N_u * D_u + 1, dtype=np.float64).reshape(N_u, D_u)
-    hi = Hankel(torch.from_numpy(hi))  # Hankel matrix (hr, hc)
+    hi = Hankel_new(torch.from_numpy(hi), nr, nc, mean=False)  # Hankel matrix (hr, hc)
 
     # Replace missing values with mean of the data
     mu = torch.sum(u) / torch.sum(omega)
-    u = u.type(torch.float)
+    # u = u.type(torch.float)
     u = u + (mu * torch.ones((1, N_u))) * (torch.zeros((D_u, N_u)))
 
-    Ab = Hankel(torch.transpose(u, 0, 1))  # Hankel matrix (hr, hc)
+    Ab = Hankel_new(torch.transpose(u, 0, 1), nr, nc, mean=False)  # Hankel matrix (hr, hc)
     A = Ab[:, :-1]  # [hr, hc - 1]
     b = torch.unsqueeze(Ab[:, -1], 1)  # [hr, 1]
 
@@ -200,6 +205,11 @@ def fast_hstln_mo(u, R, slow):
             (MQ, MR) = torch.qr(M, True)
 
         A_2 = MR
+        # print('type MQ:', MQ.type())
+        # # print('type w:', w.type())
+        # print('type eta:', eta.type())
+        # print('type D:', D.type())
+        # print('type r:', r.type())
         b_2 = torch.matmul(MQ.t(), - torch.cat([w * r, torch.matmul(D, eta)]))
         x_2 = torch.lstsq(b_2, A_2)
         x_2 = x_2.solution
@@ -220,4 +230,10 @@ def fast_hstln_mo(u, R, slow):
     eta = eta.view(D_u, N_u)
     u_hat = u + eta
     mse = (torch.norm(eta * torch.ones((D_u, N_u)), 'fro') ** 2) / (torch.sum(omega * D_u))
+    # print('type u_hat:', u_hat.type())
+    # print('type eta:', eta.type())
+    torch.set_default_dtype(torch.float32)
     return u_hat, eta, mse
+
+
+

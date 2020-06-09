@@ -32,7 +32,7 @@ draw_mask = False
 draw_candidates = False
 filter_boxes = False
 bbox_rotated = True
-num_frames = 150  # 155 for Acrobats
+num_frames = 60  # 155 for Acrobats
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
 sequence = 'acrobats'
 video = 'video0'
@@ -215,28 +215,28 @@ if __name__ == '__main__':
 
 
                 # TODO: Decide winner with Dynamics AND UPDATE TRACKER IF REQUIRED
-                # tracker = dynamics[key]
-                # c, pred_pos = tracker.update(target_pos, target_sz, score)
-                # state['target_pos'] = pred_pos
+                tracker = dynamics[key]
+                c, pred_pos = tracker.update(target_pos, target_sz, score)
+                state['target_pos'] = pred_pos
 
                 print('target pos after:', state['target_pos'])
-                if f == 57:
-                    target_pos = np.array([593, 437])
-                    target_sz = np.array([45, 95])
+                # if f == 57:
+                target_pos = np.array([593, 437])
+                target_sz = np.array([45, 95])
 
-                    # if c[0] or c[1]:
-                    cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, (0, 254, 254), 3)
-                    location2 = cxy_wh_2_rect(target_pos, target_sz)
-                    rbox_in_img = np.array([[location2[0], location2[1]],
-                                            [location2[0] + location2[2], location2[1]],
-                                            [location2[0] + location2[2], location2[1] + location2[3]],
-                                            [location2[0], location2[1] + location2[3]]])
-                    location2 = rbox_in_img.flatten()
-                    cv2.polylines(im, [np.int0(location2).reshape((-1, 1, 2))], True, (0, 254, 254), 3)
+                # if c[0] or c[1]:
+                cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, (0, 254, 254), 3)
+                location2 = cxy_wh_2_rect(target_pos, target_sz)
+                rbox_in_img = np.array([[location2[0], location2[1]],
+                                        [location2[0] + location2[2], location2[1]],
+                                        [location2[0] + location2[2], location2[1] + location2[3]],
+                                        [location2[0], location2[1] + location2[3]]])
+                location2 = rbox_in_img.flatten()
+                cv2.polylines(im, [np.int0(location2).reshape((-1, 1, 2))], True, (0, 254, 254), 3)
 
                 # state[target_pose] and state[target_sz]: are numpy.ndarray of shape (2,)
-                    state['target_pos'] = target_pos
-                    state['target_sz'] = target_sz
+                state['target_pos'] = target_pos
+                state['target_sz'] = target_sz
                     # siammask = Custom(anchors=cfg['anchors'])
                     # if args.resume:
                     #     assert isfile(args.resume), 'Please download {} first.'.format(args.resume)

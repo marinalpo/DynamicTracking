@@ -62,6 +62,24 @@ def append_pred_single(f, ob, location, df):
   return df
 
 
+def create_init(init_path, num_frames, max_num_obj):
+    columns_standard = ['FrameID', 'ObjectID', 'x_topleft', 'y_topleft', 'Width', 'Height', 'isActive',
+                        'isOccluded', 'cx', 'cy']
+    init = pd.read_csv(init_path, sep=',', header=None)
+    init.columns = columns_standard
+    init = init[init.FrameID < num_frames]
+    total_obj = init.ObjectID.unique()  # [5, 34, 65, 2...]
+    if len(total_obj) > max_num_obj:
+        total_obj = total_obj[:max_num_obj]
+        init = init[init['ObjectID'].isin(total_obj)]
+    return init, total_obj
+
+
+def compute_centroid(loc):
+    centx = 0.25 * (loc[0] + loc[2] + loc[4] + loc[6])
+    centy = 0.25 * (loc[1] + loc[3] + loc[5] + loc[7])
+    return np.array([centx, centy])
+
 def get_paths(dataset, sequence, video='video0'):
 
     if dataset == 0:
@@ -69,22 +87,25 @@ def get_paths(dataset, sequence, video='video0'):
         root = '/data/2DMOT2015/train/'
         img_path = root + sequence + '/img1/'
         init_path = root + sequence + '/gt/init.txt'
+        init_path = root + sequence + '/gt/gt.txt'
 
     elif dataset == 1:  # SMOT
         dataset = 'SMOT'
         img_path = '/data/SMOT/' + sequence + '/img/'
         init_path = '/data/SMOT/' + sequence + '/gt/init.txt'
+        gt_path = '/data/SMOT/' + sequence + '/gt/gt.txt'
 
     elif dataset == 2:  # Stanford
         dataset = 'stanford-campus'
         img_path = '/data/stanford-campus/videos/' + video + '/'
         init_path = '/data/stanford-campus/annotations/' + sequence + '/' + video + '/init.txt'
+        init_path = '/data/stanford-campus/annotations/' + sequence + '/' + video + '/gt.txt'
 
     results_path = '/data/results/'
     centroids_path = '/data/Marina/centroids/centroids_' + dataset + '_' + sequence + '.obj'
     locations_path = '/data/Marina/centroids/locations_' + dataset + '_' + sequence + '.obj'
 
-    return img_path, init_path, results_path, centroids_path, locations_path, dataset
+    return img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_path
 
 
 def to_torch(ndarray):
@@ -350,7 +371,9 @@ def siamese_track_plus(state, im, N, mask_enable=False, refine_enable=False, dev
         score, delta, mask = net.track_mask(
             x_crop.to(device))  # score: (1,10,25,25), delta: (1, 20 (5boxes*4coords), 25, 25), mask: (1, 63*63, 25, 25)
     else:
+        print(device)
         score, delta = net.track(x_crop.to(device))
+
 
     # np.save('/data/Marina/x_crop2.npy', x_crop.data.cpu().numpy())
     # np.save('/data/Marina/delta.npy', delta.data.cpu().numpy())
@@ -558,7 +581,7 @@ def siamese_track_plus(state, im, N, mask_enable=False, refine_enable=False, dev
     state['target_pos'] = target_pos
     state['target_sz'] = target_sz
     state['score'] = bboxes[4, 0]
-    state['mask'] = list_masks[0]
+    # state['mask'] = list_masks[0]
     state['ploygon'] = rboxes[0][0]
     return state, list_masks, rboxes
 
@@ -602,6 +625,7 @@ def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu
         score, delta, mask = net.track_mask(
             x_crop.to(device))  # score: (1,10,25,25), delta: (1, 20 (5boxes*4coords), 25, 25), mask: (1, 63*63, 25, 25)
     else:
+        print(device)
         score, delta = net.track(x_crop.to(device))
 
     delta = delta.permute(1, 2, 3, 0).contiguous().view(4, -1).data.cpu().numpy()
@@ -1017,9 +1041,9 @@ def main():
     logger.info('Mean Speed: {:.2f} FPS'.format(np.mean(speed_list)))
 
 
-def append_pred(pred, frame, objectID, x, y, w, h):
+def append_pred(pred, frame, objectID, x, y, w, h, cx, cy):
     my_dict = {'FrameID': frame, 'ObjectID': objectID, 'x_topleft': x, 'y_topleft': y, 'Width': w, 'Height': h,
-              'isActive': 1, 'isOccluded': 0}
+              'isActive': 1, 'isOccluded': 0, 'cx': cx, 'cy': cy}
     pred = pred.append(pd.DataFrame(my_dict, index=[0]))
     return pred
 
