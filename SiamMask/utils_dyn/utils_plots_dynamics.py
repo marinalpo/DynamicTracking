@@ -806,6 +806,7 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin):
     jbld = tracker.jbld_pos
     scores = tracker.scores
     Rs = tracker.Rs_clas
+    Rs_pred = tracker.Rs_pred
 
     max_jbld = np.max(jbld)
     max_etas = np.max(etas)
@@ -818,7 +819,7 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin):
     T0 = tracker.T0
     R = 4
 
-    fig, ax = plt.subplots(4, 2)
+    fig, ax = plt.subplots(5, 2)
     fig.tight_layout()
 
     for i in range(4):
@@ -875,31 +876,37 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin):
     ax[2, 1].axhline(tracker.th_eta, linestyle=':', color='k', alpha=0.5)
 
 
-    # ax[3, 0].bar(frames, Rs[:, 0], color='r')
-    # ax[3, 0].set_title('R optim for coord. x')
-    # ax[3, 1].bar(frames, Rs[:, 1], color='g')
-    # ax[3, 1].set_title('R optim for coord. y')
+    ax[3, 0].bar(frames, Rs[:, 0], color='r', label='Class. (eta_max='+str(tracker.eta_max_clas)+')')
+    ax[3, 0].bar(frames, Rs_pred[:, 0], color='k',  alpha=0.6, label='Pred. (eta_max='+str(tracker.eta_max_pred)+')')
+    ax[3, 0].set_title('R optim for coord. x')
+    ax[3, 0].legend()
+
+    ax[3, 1].bar(frames, Rs[:, 1], color='g', label='Class. (eta_max='+str(tracker.eta_max_clas)+')')
+    ax[3, 1].bar(frames, Rs_pred[:, 1], color='k', alpha=0.6, label='Pred. (eta_max=' + str(tracker.eta_max_pred) + ')')
+    ax[3, 1].set_title('R optim for coord. y')
+    ax[3, 1].bar(frames, Rs_pred[:, 1], color='k')
+    ax[3, 1].legend()
 
 
     # NOTE: Plot score
-    ax[3, 0].plot(frames, scores, c='k')
-    ax[3, 0].set_title('Appearance-based tracker score (confidence)')
-    ax[3, 0].axhline(tracker.th_score, linestyle=':', color='k', alpha=0.5)
-    ax[3, 0].axhline(tracker.th_score_min, linestyle=':', color='k', alpha=0.5)
-    ax[3, 0].set_xlabel('frame')
+    ax[4, 0].plot(frames, scores, c='k')
+    ax[4, 0].set_title('Appearance-based tracker score (confidence)')
+    ax[4, 0].axhline(tracker.th_score, linestyle=':', color='k', alpha=0.5)
+    ax[4, 0].axhline(tracker.th_score_min, linestyle=':', color='k', alpha=0.5)
+    ax[4, 0].set_xlabel('frame')
 
-    ax[3, 1].plot(frames, scores, c='k')
-    ax[3, 1].set_title('Appearance-based tracker score (confidence)')
-    ax[3, 1].axhline(tracker.th_score, linestyle=':', color='k', alpha=0.5)
-    ax[3, 1].axhline(tracker.th_score_min, linestyle=':', color='k', alpha=0.5)
-    ax[3, 1].set_xlabel('frame')
+    ax[4, 1].plot(frames, scores, c='k')
+    ax[4, 1].set_title('Appearance-based tracker score (confidence)')
+    ax[4, 1].axhline(tracker.th_score, linestyle=':', color='k', alpha=0.5)
+    ax[4, 1].axhline(tracker.th_score_min, linestyle=':', color='k', alpha=0.5)
+    ax[4, 1].set_xlabel('frame')
 
     flags = tracker.predict_flag
 
     for f, flag in enumerate(flags):
         for d in range(2):
             if flag[d]:
-                for i in range(4):
+                for i in range(5):
                     if i == 0:
                         a = 1
                     else:

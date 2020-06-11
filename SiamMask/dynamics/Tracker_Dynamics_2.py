@@ -30,14 +30,14 @@ class TrackerDyn_2:
         self.slow = False  # If true: Slow(but Precise), if false: Fast
         self.norm = True  # If true: Norm, if false: MSE
         self.eta_max_clas = 0.5
-        self.eta_max_pred = 20
+        self.eta_max_pred = 5
 
         # Thresholds to base the classification decisions on
         self.th_jbld = 0.5  # 0.3
         self.th_jbld_max = 0.75  # 1
         self.th_eta = 15  # 15
-        self.th_score = 0.9  # 0.96
-        self.th_score_min = 0.85  # 0.85
+        self.th_score = 0.95  # 0.96
+        self.th_score_min = 0.8  # 0.85
 
         # Buffers with data
         self.buffer_pos = np.zeros([self.T0, 2])
@@ -51,7 +51,8 @@ class TrackerDyn_2:
         self.jbld_pos = np.zeros([self.T0, 2])  # cx, cy - JBLD with Sliding Window
         # self.dist_sz = np.zeros([self.T0, 2])  # w, h
         self.eta_norm_dif = np.zeros([self.T0, 2])
-        self.Rs_clas = np.zeros([self.T0, 2])  # R: Dynamics returned by hstln
+        self.Rs_clas = np.zeros([self.T0, 2])  # R: Dynamics returned by hstln when classifying
+        self.Rs_pred = np.zeros([self.T0, 2])  # R: Dynamics returned by hstln when predicting
 
         # Buffers with flags
         self.predict_flag = [[False, False]] * self.T0
@@ -65,6 +66,9 @@ class TrackerDyn_2:
     def update(self, pos, sz, sco):
         pred_pos = pos
         print('incoming:', pred_pos)
+
+        if self.t == 46:
+            print('a')
 
         c = [False, False]
 
@@ -105,6 +109,7 @@ class TrackerDyn_2:
         eta_dif = np.zeros((1, 2))
         jbld = np.zeros((1, 2))
         Rs = np.zeros((1, 2))
+        Rs_pred = np.zeros((1, 2))
 
         for d in range(2):
             # print('d:', d)
@@ -123,7 +128,8 @@ class TrackerDyn_2:
             # norm_eta[0, d] = torch.norm(eta, 'fro').numpy()
 
             # data_corr: Last T0 samples INCLUDING the current one
-            data_corr = self.buffer_pos[self.t - self.T0 - 1:self.t, d]
+            # TODO: Change buffer_pos_corr
+            data_corr = self.buffer_pos_corr[self.t - self.T0 - 1:self.t, d]
             data_corr = torch.from_numpy(data_corr)
             data_corr = data_corr.view(1, len(data_corr))
             [uhat_corr, eta_corr, x, mse] = fast_hstln_mo(data_corr, R, self.slow)
@@ -136,6 +142,7 @@ class TrackerDyn_2:
 
         self.jbld_pos = np.vstack((self.jbld_pos, jbld))
         self.Rs_clas = np.vstack((self.Rs_clas, Rs))
+        self.Rs_pred = np.vstack((self.Rs_pred, Rs_pred))
         self.eta_norm_dif = np.vstack((self.eta_norm_dif, eta_dif))
         return uhat_root
 
@@ -160,7 +167,7 @@ class TrackerDyn_2:
             #     c[d] = True
 
         # Update classification flag
-        # TODO: Si es vol canviar a que es prediguin els dos fer algo tipo .any()
+        # Si es vol canviar a que es prediguin els dos fer algo tipo .any()
         self.predict_flag.append(c)
         return c
 
@@ -174,13 +181,24 @@ class TrackerDyn_2:
             # TODO: POSSAR EL self.buffer_pos_corr
             data_root = self.buffer_pos_corr[self.t - self.T0 - 1:self.t - 1, d]
             u_ts = data_root
+            # print('u_ts shape:', u_ts.shape)
             data_root = torch.from_numpy(data_root)
             data_root = data_root.view(1, len(data_root))
             [uhat_root, eta_root, x, R] = fast_incremental_hstln_mo(data_root, self.eta_max_pred, self.slow)
+            self.Rs_pred[self.t - 1, d] = R
 
             # 1. Construct a model instance with our dataset
+
+            # uhat = uhat_root.numpy()
+            # uhat = uhat.squeeze()
+            # u_ts = uhat
+            # u_ts = u_ts.astype(int)
+            # print('type uts 0', type(u_ts[0]))
+
             ts = pd.DataFrame(u_ts)
             ts.columns = ['u']
+
+            print('uhat:', u_ts)
 
             # Step 1: construct an SARIMAX model for US inflation data
             # https://www.statsmodels.org/dev/generated/statsmodels.tsa.statespace.sarimax.SARIMAX.html#statsmodels.tsa.statespace.sarimax.SARIMAX
@@ -191,6 +209,7 @@ class TrackerDyn_2:
 
             # Step 3: forecast results
             pred = results.forecast(1)
+            print('pred:', pred)
             # pred = results.forecast(1).to_numpy()
 
 

@@ -4,12 +4,16 @@ import pickle as pkl
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+import warnings
+
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
+warnings.simplefilter('ignore', ConvergenceWarning)
 
 # from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
 import cv2
 from scipy.io import savemat
 
-# # TODO: When debugging
+# TODO: When debugging
 # from SiamMask.utils_dyn.utils_plots_dynamics import *
 # from SiamMask.dynamics.Tracker_Dynamics_2 import TrackerDyn_2
 
@@ -53,7 +57,7 @@ target_sz = target_sz_dict[obj]
 
 T = len(target_pos)
 tin = 1
-tfin = 50  # T - 1
+tfin = 60  # T - 1
 
 tracker = TrackerDyn_2(T0=T0)
 
@@ -77,6 +81,3 @@ c_gt = c_gt[:tfin-1, :]
 
 
 plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin)
-
-
-

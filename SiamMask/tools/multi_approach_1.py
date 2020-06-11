@@ -11,7 +11,6 @@ from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
 from dynamics.Tracker_Dynamics_2 import TrackerDyn_2
 from utils_dyn.utils_plots_dynamics import *
 import warnings
-
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 warnings.simplefilter('ignore', ConvergenceWarning)
 
@@ -35,18 +34,19 @@ k = 3  # Maximum number of candidates after filtering NMS
 max_num_obj = 10  # Maximum number of objects being tracked
 
 # Tracker Parameters
+correct_with_dynamics = True
 draw_mask = False
 draw_proposal = True
 draw_candidates = False
 draw_GT = True
 filter_boxes = False
 bbox_rotated = True
-num_frames = 40  # 154 for Acrobats
+num_frames = 70  # 154 for Acrobats
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
-sequence = 'juggling'
+sequence = 'acrobats'
 video = 'video0'
 
-# Dynamics Parameters
+# Dynamics Parametersscp -r marina@10.90.33.205:/data/results/ /Users/marinaalonsopoal/Desktop/
 T0 = 8  # System memory
 eps = 1  # Noise variance
 metric = 0  # if 0: JBLD, if 1: JKL
@@ -60,7 +60,7 @@ img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_p
 
 
 # TODO: Si el volem nomes dun objecte
-# init_path = '/data/Marina/init_1.txt'
+init_path = '/data/Marina/init_2.txt'
 c_gt = np.load('/data/SMOT/acrobats/gt/centr_gt_2.npy')
 
 
@@ -212,18 +212,19 @@ if __name__ == '__main__':
 
 
                 # # TODO: Decide winner with Dynamics AND UPDATE TRACKER IF REQUIRED
-                c, pred_pos = tracker_dyn.update(target_pos, target_sz, score)
-                if c[0] or c[1]:
-                    location = cxy_wh_2_rect(pred_pos, target_sz)
-                    rbox_in_img = np.array([[location[0], location[1]],
-                                            [location[0] + location[2], location[1]],
-                                            [location[0] + location[2], location[1] + location[3]],
-                                            [location[0], location[1] + location[3]]])
-                    location = rbox_in_img.flatten()
-                    cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, (0, 254, 254), 3)
+                if correct_with_dynamics:
+                    c, pred_pos = tracker_dyn.update(target_pos, target_sz, score)
+                    if c[0] or c[1]:
+                        location = cxy_wh_2_rect(pred_pos, target_sz)
+                        rbox_in_img = np.array([[location[0], location[1]],
+                                                [location[0] + location[2], location[1]],
+                                                [location[0] + location[2], location[1] + location[3]],
+                                                [location[0], location[1] + location[3]]])
+                        location = rbox_in_img.flatten()
+                        cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, (0, 254, 254), 3)
 
-                state['target_pos'] = pred_pos
-                state['target_sz'] = target_sz
+                    state['target_pos'] = pred_pos
+                    state['target_sz'] = target_sz
 
 
                 # print('target pos after correcting:', state['target_pos'])
@@ -277,8 +278,8 @@ if __name__ == '__main__':
     print('--------------------------------------------------------\n')
 
 
-    # tin = 1
-    # tfin = num_frames + 1
-    # c_gt = c_gt[:tfin - 1, :]
-    # plot_jbld_eta_score_4(tracker_dyn, c_gt, '2', norm, slow, tin, tfin)
+    tin = 1
+    tfin = num_frames + 1
+    c_gt = c_gt[:tfin - 1, :]
+    plot_jbld_eta_score_4(tracker_dyn, c_gt, '2', norm, slow, tin, tfin)
 
