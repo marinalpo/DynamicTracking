@@ -9,6 +9,11 @@ from tools.test_multi import *
 from custom import Custom
 from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
 from dynamics.Tracker_Dynamics_2 import TrackerDyn_2
+from utils_dyn.utils_plots_dynamics import *
+import warnings
+
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
+warnings.simplefilter('ignore', ConvergenceWarning)
 
 # Parsing
 parser = argparse.ArgumentParser(description='PyTorch Tracking Demo')
@@ -17,6 +22,7 @@ parser.add_argument('--resume', type=str, metavar='PATH',
 parser.add_argument('--config', dest='config', default='config_davis.json',
                     help='hyper-parameter of SiamMask in json format')
 args = parser.parse_args()
+
 
 # Definitions
 font = cv2.FONT_HERSHEY_SIMPLEX
@@ -35,14 +41,13 @@ draw_candidates = False
 draw_GT = True
 filter_boxes = False
 bbox_rotated = True
-num_frames = 154  # 154 for Acrobats
+num_frames = 40  # 154 for Acrobats
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
-sequence = 'acrobats'
+sequence = 'juggling'
 video = 'video0'
 
 # Dynamics Parameters
-T0 = 11  # System memory
-R = 5
+T0 = 8  # System memory
 eps = 1  # Noise variance
 metric = 0  # if 0: JBLD, if 1: JKL
 W = 3  # Smoothing window length
@@ -55,7 +60,9 @@ img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_p
 
 
 # TODO: Si el volem nomes dun objecte
-# init_path = '/data/Marina/init_4.txt'
+# init_path = '/data/Marina/init_1.txt'
+c_gt = np.load('/data/SMOT/acrobats/gt/centr_gt_2.npy')
+
 
 # Loads init file, deletes targets if there are more than max_num_obj in the requested frames
 init, total_obj = create_init(init_path, num_frames, max_num_obj)
@@ -129,6 +136,7 @@ if __name__ == '__main__':
                 # x1, y1, x2, y2, x3, y3, x4, y4 = x + w, y + h, x, y + h, x, y, x + w, y
                 cx, cy = row['cx'], row['cy']
                 target_pos = np.array([x + w / 2, y + h / 2])
+                print('\n TARGET POS INIT: ', target_pos, '\n')
                 target_sz = np.array([w, h])
 
                 # locations_dict[ob].append([[np.array([x1, y1, x2, y2, x3, y3, x4, y4])]])
@@ -137,8 +145,7 @@ if __name__ == '__main__':
 
                 torch.cuda.set_device(device)
 
-                tracker_dyn = TrackerDyn_2(T0=T0, R=R, W=W, tinit=f, noise=eps, metric=metric, slow=slow,
-                                           norm=norm)
+                tracker_dyn = TrackerDyn_2(T0=T0)
                 c, pred_pos = tracker_dyn.update(target_pos, target_sz, 1)
 
                 nested_obj = {'target_pos': target_pos, 'target_sz': np.array([w, h]),
@@ -165,11 +172,11 @@ if __name__ == '__main__':
                 # print('target pos before tracking:', state['target_pos'])
                 # print('target sz before tracking:', state['target_sz'])
 
-                # state, masks, rboxes_track = siamese_track_plus(state=value['state'], im=im_track, N=N,
-                #                                                 mask_enable=False,
-                #                                                 refine_enable=False, device=device)
-                state = siamese_track(state=value['state'], im=im_track, mask_enable=False, refine_enable=False,
-                                      device=device, debug=False)
+                state, masks, rboxes_track = siamese_track_plus(state=value['state'], im=im_track, N=N,
+                                                                mask_enable=True,
+                                                                refine_enable=True, device=device)
+                # state = siamese_track(state=value['state'], im=im_track, mask_enable=True, refine_enable=True,
+                #                       device=device, debug=False)
 
                 # print('target pos after tracking:', state['target_pos'])
                 # print('target sz after tracking:', state['target_sz'])
@@ -204,10 +211,19 @@ if __name__ == '__main__':
 
 
 
-                # TODO: Decide winner with Dynamics AND UPDATE TRACKER IF REQUIRED
-                # c, pred_pos = tracker_dyn.update(target_pos, target_sz, score)
-                # state['target_pos'] = pred_pos
-                # state['target_sz'] = pred_sz
+                # # TODO: Decide winner with Dynamics AND UPDATE TRACKER IF REQUIRED
+                c, pred_pos = tracker_dyn.update(target_pos, target_sz, score)
+                if c[0] or c[1]:
+                    location = cxy_wh_2_rect(pred_pos, target_sz)
+                    rbox_in_img = np.array([[location[0], location[1]],
+                                            [location[0] + location[2], location[1]],
+                                            [location[0] + location[2], location[1] + location[3]],
+                                            [location[0], location[1] + location[3]]])
+                    location = rbox_in_img.flatten()
+                    cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, (0, 254, 254), 3)
+
+                state['target_pos'] = pred_pos
+                state['target_sz'] = target_sz
 
 
                 # print('target pos after correcting:', state['target_pos'])
@@ -259,4 +275,10 @@ if __name__ == '__main__':
     print('MOTP:', motp, '   (vs. MOTP SiamMask: ', motp_siam, ' )')
     print('CD:  ', cd, '   (vs. CD SiamMask:   ', cd_siam, ' )')
     print('--------------------------------------------------------\n')
+
+
+    # tin = 1
+    # tfin = num_frames + 1
+    # c_gt = c_gt[:tfin - 1, :]
+    # plot_jbld_eta_score_4(tracker_dyn, c_gt, '2', norm, slow, tin, tfin)
 

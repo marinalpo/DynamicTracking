@@ -416,6 +416,7 @@ def fast_incremental_hstln_mo(u, eta_max, slow):
             [u_hat, eta, mse, x] = fast_hstln_mo(u, R, slow, max_iter=50, tol=1e-7)
             av_eta = torch.norm(eta, 'fro') ** 2 / (D_u * N_u)
 
+
         if av_eta < eta_max ** 2:
             break
 

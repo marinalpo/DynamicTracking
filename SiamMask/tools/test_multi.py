@@ -421,7 +421,6 @@ def siamese_track_plus(state, im, N, mask_enable=False, refine_enable=False, dev
     # NOTE: Comença la nostre aportació
 
     # cos window (motion model)
-    # N = 17  # TODO: Passar d'argument
     bboxes = np.zeros((6, N), dtype=np.float64)
     # bboxes has the shape (6 , Npoints) ; 0=res_x, 1=res_y, 2=res_w, 3=res_h, 4=score, 5=best_pscore_id_tmp
     pscore = pscore * (1 - p.window_influence) + window * p.window_influence
@@ -582,7 +581,7 @@ def siamese_track_plus(state, im, N, mask_enable=False, refine_enable=False, dev
     state['target_sz'] = target_sz
     state['score'] = bboxes[4, 0]
     # state['mask'] = list_masks[0]
-    state['ploygon'] = rboxes[0][0]
+    # state['ploygon'] = rboxes[0][0]
     return state, list_masks, rboxes
 
 

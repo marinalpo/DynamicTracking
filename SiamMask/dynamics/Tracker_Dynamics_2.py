@@ -107,12 +107,16 @@ class TrackerDyn_2:
         Rs = np.zeros((1, 2))
 
         for d in range(2):
+            # print('d:', d)
             # data_root: Last T0 samples EXCLUDING the current one
             # TODO: Change buffer_pos_corr
             data_root = self.buffer_pos_corr[self.t - self.T0 - 1:self.t - 1, d]
             data_root = torch.from_numpy(data_root)
             data_root = data_root.view(1, len(data_root))
+            # print('data root:', data_root)
             [uhat_root, eta_root, x, R] = fast_incremental_hstln_mo(data_root, self.eta_max_clas, self.slow)
+            # print('uhat_root:', uhat_root)
+            # print('R:', R)
             # u_hat = (u_hat.numpy()).flatten()
             # uhat[:, d] = u_hat
             Rs[0, d] = R
@@ -128,6 +132,7 @@ class TrackerDyn_2:
 
             # Compute JBLD
             jbld[0, d] = compare_dyn_R(uhat_root.t(), uhat_corr.t(), self.noise, R, mean=False)
+            # print('jbld:', jbld[0, d])
 
         self.jbld_pos = np.vstack((self.jbld_pos, jbld))
         self.Rs_clas = np.vstack((self.Rs_clas, Rs))
@@ -172,7 +177,6 @@ class TrackerDyn_2:
             data_root = torch.from_numpy(data_root)
             data_root = data_root.view(1, len(data_root))
             [uhat_root, eta_root, x, R] = fast_incremental_hstln_mo(data_root, self.eta_max_pred, self.slow)
-            print('R:', R)
 
             # 1. Construct a model instance with our dataset
             ts = pd.DataFrame(u_ts)
@@ -186,7 +190,9 @@ class TrackerDyn_2:
             results = model.fit(disp=0, maxiter=200, method='nm')
 
             # Step 3: forecast results
-            pred = results.forecast(1).to_numpy()
+            pred = results.forecast(1)
+            # pred = results.forecast(1).to_numpy()
+
 
         return pred
 

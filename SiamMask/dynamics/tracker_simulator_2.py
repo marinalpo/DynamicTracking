@@ -51,15 +51,15 @@ scores = scores[obj]
 target_pos = target_pos_dict[obj]  # list of length 154. target_pos[f] is (2,)
 target_sz = target_sz_dict[obj]
 
-
 T = len(target_pos)
 tin = 1
-tfin = 60  # T - 1
+tfin = 50  # T - 1
 
 tracker = TrackerDyn_2(T0=T0)
+
 for f in range(1, tfin):  # T
     print('-----Frame:', f, '-----')
-    c, pred_pos = tracker.update(target_pos[f], target_sz[f], scores[f])
+    c, pred_pos = tracker.update(target_pos[f-1], target_sz[f-1], scores[f-1])
     if c[0] or c[1]:
         print('PREDICT!')
         # tfin = f + 1
@@ -79,28 +79,4 @@ c_gt = c_gt[:tfin-1, :]
 plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin)
 
 
-# f = np.arange(tin, tfin)
-# w = tracker.buffer_sz[:, 0]
-# plt.scatter(f, w)
-# plt.show()
-# plot_jbld_eta_score(tracker_pred, tracker_gt, obj, norm, slow, tin, tfin)
-# f = 36
-# target_pos = tracker.buffer_pos[f, :]
-# target_sz = tracker.buffer_sz[f, :]
-# print('target pos:', target_pos)
-# print('target sz:', target_sz)
-# location = cxy_wh_2_rect(target_pos, target_sz)
-# print('location:', location)
-# rbox_in_img = np.array([[location[0], location[1]],
-#                         [location[0] + location[2], location[1]],
-#                         [location[0] + location[2], location[1] + location[3]],
-#                         [location[0], location[1] + location[3]]])
-# print('rbox_in_img:', rbox_in_img)
-#
-# img_files = sorted(os.listdir(img_path))
-# ims = [cv2.imread(os.path.join(img_path, imf)) for imf in img_files]
-# ima = ims[f]
-# location = rbox_in_img.flatten()
-# cv2.polylines(ima, [np.int0(location).reshape((-1, 1, 2))], True, (0, 255, 0), 3)
-# cv2.imshow('bla', ima)
-# cv2.waitKey(0)
+
