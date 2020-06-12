@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import statsmodels.api as sm
 import pandas as pd
+from sklearn import linear_model
 
 # TODO: Else
 from utils_dyn.utils_torch import *
@@ -22,6 +23,7 @@ class TrackerDyn_2:
 
         # Parameters
         self.T0 = T0
+        self.T0_ratio = 3
         self.t = 1
         self.t_init = t_init
         self.noise = 1
@@ -29,14 +31,14 @@ class TrackerDyn_2:
         self.W = 1
         self.slow = False  # If true: Slow(but Precise), if false: Fast
         self.norm = True  # If true: Norm, if false: MSE
-        self.eta_max_clas = 0.5
-        self.eta_max_pred = 5
+        self.eta_max_clas = 1
+        self.eta_max_pred = 10
 
         # Thresholds to base the classification decisions on
         self.th_jbld = 0.5  # 0.3
         self.th_jbld_max = 0.75  # 1
         self.th_eta = 15  # 15
-        self.th_score = 0.95  # 0.96
+        self.th_score = 0.90  # 0.96
         self.th_score_min = 0.8  # 0.85
 
         # Buffers with data
@@ -45,6 +47,7 @@ class TrackerDyn_2:
         self.buffer_pos_m = np.zeros([self.T0 - 1, 2])  # Means of the data
 
         self.buffer_sz = np.zeros([self.T0, 2])
+        self.buffer_ratio = np.zeros(self.T0)
 
 
         # Buffers with distances and metrics
@@ -65,10 +68,7 @@ class TrackerDyn_2:
 
     def update(self, pos, sz, sco):
         pred_pos = pos
-        print('incoming:', pred_pos)
-
-        if self.t == 46:
-            print('a')
+        pred_ratio = sz[0]/sz[1]
 
         c = [False, False]
 
@@ -80,10 +80,13 @@ class TrackerDyn_2:
             self.buffer_pos[self.t - 1, :] = np.reshape(pos, (1, 2))
             self.buffer_pos_corr[self.t - 1, :] = np.reshape(pos, (1, 2))
             self.buffer_sz[self.t - 1, :] = np.reshape(sz, (1, 2))
+            self.buffer_ratio[self.t-1] = sz[0]/sz[1]
         else:
             self.buffer_pos = np.vstack((self.buffer_pos, np.reshape(pos, (1, 2))))
             self.buffer_pos_corr = np.vstack((self.buffer_pos_corr, np.reshape(pos, (1, 2))))
             self.buffer_sz = np.vstack((self.buffer_sz, np.reshape(sz, (1, 2))))
+            self.buffer_ratio = np.append(self.buffer_ratio, (sz[0]/sz[1]))
+
 
         # Compute distances, etas, classify and predict
         if self.t > self.T0:
@@ -92,18 +95,45 @@ class TrackerDyn_2:
 
             c = self.classify()
 
-            if c[0]:
-                print('Lets predict x!')
+            # TODO: PREDICT BOTH
+            if c[0] or c[1]:
+                print('Lets predict BOTH!')
                 pred_pos[0] = self.predict(0)
                 self.buffer_pos_corr[self.t - 1, 0] = pred_pos[0]
-            if c[1]:
-                print('Lets predict y!')
                 pred_pos[1] = self.predict(1)
                 self.buffer_pos_corr[self.t - 1, 1] = pred_pos[1]
+                pred_ratio = self.predict_ratio()
+                self.buffer_ratio[self.t-1] = pred_ratio
+
+                # if c[0]:
+                #     print('Lets predict x!')
+                #     pred_pos[0] = self.predict(0)
+                #     self.buffer_pos_corr[self.t - 1, 0] = pred_pos[0]
+                # if c[1]:
+                #     print('Lets predict y!')
+                #     pred_pos[1] = self.predict(1)
+                #     self.buffer_pos_corr[self.t - 1, 1] = pred_pos[1]
 
         self.t += 1
-        print('Predicted:', pred_pos)
-        return c, pred_pos
+        # print('Predicted:', pred_pos)
+        return c, pred_pos, pred_ratio
+
+    def predict_ratio(self):
+        data = self.buffer_ratio[self.t - self.T0_ratio - 1:self.t - 1].reshape(-1, 1)
+        print('data to predict ratio:', data)
+        x = np.arange(1, self.T0_ratio+1).reshape(-1, 1)
+        regr = linear_model.LinearRegression()
+        regr.fit(x, data)
+        pred_ratio = regr.predict(np.asarray((self.T0_ratio+1)).reshape(-1, 1))
+        print('predicted ratio:', pred_ratio)
+        return pred_ratio
+
+    def update_bbox(self, pos, sz):
+        x, y = pos
+        self.buffer_pos_corr[-1, 0] = x
+        self.buffer_pos_corr[-1, 1] = y
+        ratio = sz[0]/sz[1]
+        self.buffer_ratio[-1] = ratio
 
     def update_metrics(self):
         eta_dif = np.zeros((1, 2))
@@ -198,7 +228,6 @@ class TrackerDyn_2:
             ts = pd.DataFrame(u_ts)
             ts.columns = ['u']
 
-            print('uhat:', u_ts)
 
             # Step 1: construct an SARIMAX model for US inflation data
             # https://www.statsmodels.org/dev/generated/statsmodels.tsa.statespace.sarimax.SARIMAX.html#statsmodels.tsa.statespace.sarimax.SARIMAX
@@ -209,7 +238,6 @@ class TrackerDyn_2:
 
             # Step 3: forecast results
             pred = results.forecast(1)
-            print('pred:', pred)
             # pred = results.forecast(1).to_numpy()
 
 

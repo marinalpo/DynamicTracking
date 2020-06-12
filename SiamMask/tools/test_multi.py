@@ -52,20 +52,35 @@ parser.add_argument('--cpu', action='store_true', help='cpu mode')
 parser.add_argument('--debug', action='store_true', help='debug mode')
 
 
-def get_closest_bbox(rboxes, pred_pos):
-    num_boxes = len(rboxes)
+def get_best_bbox(bboxes, pred_pos, pred_ratio):
+    # bboxes shape: (4, num_cand)
 
-    polygons = np.zeros((num_boxes, 4, 2))
-    centroids = np.zeros((num_boxes, 2))
-    sizes = np.zeros((num_boxes, 2))
-    dist = np.zeros(num_boxes)
+    lambda_rat = 0
+    # lambda_x
+    num_cand = bboxes.shape[1]
 
-    for i, (box, score) in enumerate(rboxes):
-        box_mat = box.reshape(4, 2)
-        polygons[i, :, :] = box_mat
-        cx, cy, w, h = get_axis_aligned_bbox(region)
+    cx_pred = pred_pos[0]
+    cy_pred = pred_pos[1]
 
-    centroids = np.mean(polygons, axis=1)
+    cxs = bboxes[0, :]
+    cys = bboxes[1, :]
+
+    ratios = bboxes[2, :]/bboxes[3, :]
+
+    ds_centr = np.sqrt((cxs - cx_pred)**2 + (cys - cy_pred)**2)
+    ds_ratio = np.abs(ratios - pred_ratio)
+
+    print('ds_centroid:', ds_centr)
+    print('ds_ratio:', lambda_rat*ds_ratio)
+
+    j = ds_centr + lambda_rat*ds_ratio
+    min_idx = np.argmin(j)
+    w = bboxes[2, :]
+    h = bboxes[3, :]
+    pred_pos_new = np.array([cxs[min_idx], cys[min_idx]])
+    pred_sz_new = np.array([w[min_idx], h[min_idx]])
+    return pred_pos_new, pred_sz_new
+
 
 
 

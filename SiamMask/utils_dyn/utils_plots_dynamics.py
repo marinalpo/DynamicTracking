@@ -914,3 +914,65 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin):
                     ax[i, d].axvline(f+1, color=(1, 0.8, 0), alpha=a, zorder=1)
 
     plt.show()
+
+
+def plot_gt_cand_pred_box(tracker, c_gt, obj, norm, slow, tin, tfin):
+    slow_name = ['Fast', 'Slow']
+    norm_name = ['MSE', 'NORM']
+
+
+    frames = np.arange(tin, tfin)
+    centr_gt = c_gt
+    centr_pred = tracker.buffer_pos
+    centr_corr = tracker.buffer_pos_corr
+    etas = tracker.eta_norm_dif
+    jbld = tracker.jbld_pos
+    scores = tracker.scores
+    Rs = tracker.Rs_clas
+    Rs_pred = tracker.Rs_pred
+
+    max_jbld = np.max(jbld)
+    max_etas = np.max(etas)
+
+    s_gt = 25
+    s_pred = 25
+    s_p = 5
+
+    eps = tracker.noise
+    T0 = tracker.T0
+    R = 4
+
+    fig, ax = plt.subplots(2, 1)
+    fig.tight_layout()
+
+    ax[0].grid(axis='x', zorder=1, alpha=0.4)
+    ax[1].grid(axis='x', zorder=1, alpha=0.4)
+
+    fig.suptitle('Object:' + str(obj))
+    # print('shape frames:', frames.shape)
+    # print(centr_corr[:, 0].shape)
+
+    ax[0].set_title('Position Centroid x')
+    ax[0].scatter(frames, centr_pred[:, 0], c='r', s=s_pred, edgecolors='k', alpha=0.6, label='Predictions',
+                     zorder=3)
+    ax[0].scatter(frames, centr_corr[:, 0], c='k', s=s_pred, edgecolors='k', alpha=0.6, label='Corrected',
+                      zorder=2)
+    ax[0].scatter(frames, c_gt[:, 0], c='r', s=s_gt, alpha=0.2, label='GT', zorder=3)
+    ax[0].legend()
+
+    ax[1].set_title('Position Centroid y')
+    ax[1].scatter(frames, centr_pred[:, 1], c='g', s=s_pred, edgecolors='k', alpha=0.6, label='Predictions',
+                     zorder=3)
+    ax[1].scatter(frames, centr_corr[:, 1], c='k', s=s_pred, edgecolors='k', alpha=0.6, label='Corrected',
+                      zorder=2)
+    ax[1].scatter(frames, c_gt[:, 1], c='g', s=s_gt, alpha=0.2, label='GT', zorder=3)
+    # ax[0, 1].scatter(tfin, pred[0, 1], c='k')
+    ax[1].legend()
+
+    flags = tracker.predict_flag
+
+    for f, flag in enumerate(flags):
+        ax[0].axvline(f + 1, color=(1, 0.8, 0), alpha=0.5, zorder=1)
+        ax[1].axvline(f + 1, color=(1, 0.8, 0), alpha=0.5, zorder=1)
+
+    plt.show()

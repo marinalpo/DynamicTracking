@@ -1,4 +1,4 @@
-import glob
+t glob
 import numpy as np
 import cv2
 import pickle
@@ -29,28 +29,29 @@ font_size = 1
 columns_location = ['FrameID', 'ObjectID', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4']
 dataset_name = ['MOT', 'SMOT', 'Stanford']
 columns_names = ['FrameID',	'ObjectID',	'x_topleft',	'y_topleft',	'Width',	'Height',	'isActive',	'isOccluded', 'cx', 'cy']
+N = 40  # Maximum number of candidates returned by the tracking (15)
+k = 3  # Maximum number of candidates after filtering NMS
 max_num_obj = 10  # Maximum number of objects being tracked
+
 # Tracker Parameters
-correct_with_dynamics = True
+correct_with_dynamics = False
 draw_mask = False
 draw_proposal = True
 draw_candidates = True
-draw_GT = True
+draw_GT = False
 filter_boxes = False
+num_frames = 70  # 154 for Acrobats
+dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
+sequence = 'acrobats'
+video = 'video0'
+
+# Dynamics Parametersscp -r marina@10.90.33.205:/data/results/ /Users/marinaalonsopoal/Desktop/
+T0 = 8  # System memory
 eps = 1  # Noise variance
 metric = 0  # if 0: JBLD, if 1: JKL
 W = 3  # Smoothing window length
 slow = False  # If true: Slow(but Precise), if false: Fast
 norm = True  # If true: Norm, if false: MSE
-
-T0 = 13  # System memory
-num_frames = 154  # 154 for Acrobats
-N = 30  # Maximum number of candidates returned by the tracking (15)
-k = 3  # Maximum number of candidates
-# after filtering NMS
-dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
-sequence = 'acrobats'
-video = 'video0'
 
 print('\nDataset:', dataset_name[dataset], ' Sequence:', sequence, ' Number of frames:', num_frames)
 
@@ -143,7 +144,7 @@ if __name__ == '__main__':
                 torch.cuda.set_device(device)
 
                 tracker_dyn = TrackerDyn_2(T0=T0)
-                c, pred_pos, pred_ratio = tracker_dyn.update(target_pos, target_sz, 1)
+                c, pred_pos = tracker_dyn.update(target_pos, target_sz, 1)
 
                 nested_obj = {'target_pos': target_pos, 'target_sz': np.array([w, h]),
                               'init_frame': f, 'siammask': tracker[ob], 'tracker': tracker_dyn}
@@ -184,17 +185,58 @@ if __name__ == '__main__':
                         cv2.rectangle(im, (int(cx - w / 2), int(cy - h / 2)), (int(cx + w / 2), int(cy + h / 2)), (0, 254, 0), 1)
 
 
+
+                cx, cy = target_pos
+                w, h = target_sz
+                cv2.circle(im, (int(cx), int(cy)), 3, (0, 254, 254), 3)
+                cv2.rectangle(im, (int(cx - w / 2), int(cy - h / 2)), (int(cx + w / 2), int(cy + h / 2)), (0, 254, 254), 3)
+
+                # win = 0  # At this moment winner is the one that SiamMasks decides
+                # location = rboxes_cand[win][0].flatten()
+                # cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, col, 3)
+                # pos, sz = get_aligned_bbox(location)
+                # cx, cy = pos
+                # w, h = sz
+                # # cx, cy, w, h = get_axis_aligned_bbox(location)
+                # cv2.circle(im, (int(cx), int(cy)), 3, col, 3)
+                # cv2.rectangle(im, (int(cx - w / 2), int(cy - h / 2)), (int(cx + w / 2), int(cy + h / 2)), col, 3)
+                #
+                #
+                # location = poly.flatten()
+                # mask = state['mask'] > state['p'].seg_thr
+                # im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
+
+
+                # TODO: Posar cx_win i cy_win com a input Tracker Dyn
+                # state['target_pos'] = pos
+                # state['target_sz'] = sz
+
+
+                # for box in range(len(rboxes_cand)):
+                #     location = np.int0(rboxes_cand[box][0].flatten()).reshape((-1, 1, 2))
+                #     # locations.append([rboxes_cand[box][0].flatten()])
+                #     if draw_candidates:
+                #         cv2.polylines(im, [location], True, (0, 254, 0), 1)
+
+                # if filter_boxes:  # Filter overlapping boxes
+                #     rboxes = filter_bboxes_plus(rboxes_cand)
+                # else:
+                #     rboxes = rboxes_cand
+
+                # locations_dict[key].append(locations)
+
+
                 # Note: Draw bounding boxes and text
-                location = cxy_wh_2_rect(target_pos, target_sz)
-                rbox_in_img = np.array([[location[0], location[1]],
-                                        [location[0] + location[2], location[1]],
-                                        [location[0] + location[2], location[1] + location[3]],
-                                        [location[0], location[1] + location[3]]])
-                location = rbox_in_img.flatten()
-                cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, col, 3)
-                # cv2.putText(im, str(key), (int(target_pos[0]-5), int(target_pos[1]-5)), font,
-                #             font_size * 1, col, 2, cv2.LINE_AA)
-                cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, col, 3)
+                # location = cxy_wh_2_rect(target_pos, target_sz)
+                # rbox_in_img = np.array([[location[0], location[1]],
+                #                         [location[0] + location[2], location[1]],
+                #                         [location[0] + location[2], location[1] + location[3]],
+                #                         [location[0], location[1] + location[3]]])
+                # location = rbox_in_img.flatten()
+                # cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, col, 3)
+                # # cv2.putText(im, str(key), (int(target_pos[0]-5), int(target_pos[1]-5)), font,
+                # #             font_size * 1, col, 2, cv2.LINE_AA)
+                # cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, col, 3)
 
                 if draw_GT:
                     # location_gt = get_location_gt(gt_df, key, f)
@@ -209,37 +251,28 @@ if __name__ == '__main__':
                     cv2.polylines(im, [np.int0(rbox_gt.flatten()).reshape((-1, 1, 2))], True, col, 1)
 
 
-                bbox_ratio = target_pos[0]/target_pos[1]
-                print('bbox ratio:', bbox_ratio)
 
+                # # TODO: Decide winner with Dynamics AND UPDATE TRACKER IF REQUIRED
                 if correct_with_dynamics:
-                    c, pred_pos, pred_ratio = tracker_dyn.update(target_pos, target_sz, score)
-
+                    c, pred_pos = tracker_dyn.update(target_pos, target_sz, score)
                     if c[0] or c[1]:
-                        # TODO: Buscar el closest candidate
-                        # Remove winner bbox
-                        bboxes = bboxes[:, 1:]
-                        pred_pos, pred_sz = get_best_bbox(bboxes, pred_pos, pred_ratio)
-                        print('Closest:', pred_pos)
-                        print('new bbox:', pred_sz)
+                        location = cxy_wh_2_rect(pred_pos, target_sz)
+                        rbox_in_img = np.array([[location[0], location[1]],
+                                                [location[0] + location[2], location[1]],
+                                                [location[0] + location[2], location[1] + location[3]],
+                                                [location[0], location[1] + location[3]]])
+                        location = rbox_in_img.flatten()
+                        # cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, (0, 254, 254), 3)
 
-                        tracker_dyn.update_bbox(pred_pos, pred_sz)
-
-                        # Plot corrected
-                        cx, cy = pred_pos
-                        w, h = pred_sz
-                        # cv2.circle(im, (int(cx), int(cy)), 3, (0, 254, 0), 3)
-                        cv2.rectangle(im, (int(cx - w / 2), int(cy - h / 2)), (int(cx + w / 2), int(cy + h / 2)), (0, 254, 254), 3)
-
-                        state['target_pos'] = pred_pos
-                        state['target_sz'] = pred_sz
+                    state['target_pos'] = pred_pos
+                    state['target_sz'] = target_sz
 
 
                 value['state'] = state
 
                 # Append predictions to pred DF
-                # pred_df = append_pred(pred_df, f, key, target_pos[0]-target_sz[0]/2, target_pos[1]-target_sz[1]/2,
-                #                       target_sz[0], target_sz[1], target_pos[0], target_pos[1])
+                pred_df = append_pred(pred_df, f, key, target_pos[0]-target_sz[0]/2, target_pos[1]-target_sz[1]/2,
+                                      target_sz[0], target_sz[1], target_pos[0], target_pos[1])
 
 
             cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
@@ -247,7 +280,7 @@ if __name__ == '__main__':
     toc += cv2.getTickCount() - tic
 
     # print('pred_df:', pred_df)
-    # pred_df.to_csv('/data/results/pred_df_acrobats.txt', header=None, index=None, sep=',')
+    pred_df.to_csv('/data/results/pred_df_acrobats.txt', header=None, index=None, sep=',')
 
     positions_path = '/data/Marina/positions/'
 
@@ -283,8 +316,7 @@ if __name__ == '__main__':
     print('--------------------------------------------------------\n')
     #
     #
-    tin = 1
-    tfin = num_frames + 1
-    c_gt = c_gt[:tfin - 1, :]
-    plot_jbld_eta_score_4(tracker_dyn, c_gt, '2', norm, slow, tin, tfin)
-    plot_gt_cand_pred_box(tracker_dyn, c_gt, '2', norm, slow, tin, tfin)
+    # tin = 1
+    # tfin = num_frames + 1
+    # c_gt = c_gt[:tfin - 1, :]
+    # plot_jbld_eta_score_4(tracker_dyn, c_gt, '2', norm, slow, tin, tfin)
