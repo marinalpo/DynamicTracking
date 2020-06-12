@@ -52,6 +52,38 @@ parser.add_argument('--cpu', action='store_true', help='cpu mode')
 parser.add_argument('--debug', action='store_true', help='debug mode')
 
 
+def get_closest_bbox(rboxes, pred_pos):
+    num_boxes = len(rboxes)
+
+    polygons = np.zeros((num_boxes, 4, 2))
+    centroids = np.zeros((num_boxes, 2))
+    sizes = np.zeros((num_boxes, 2))
+    dist = np.zeros(num_boxes)
+
+    for i, (box, score) in enumerate(rboxes):
+        box_mat = box.reshape(4, 2)
+        polygons[i, :, :] = box_mat
+        cx, cy, w, h = get_axis_aligned_bbox(region)
+
+    centroids = np.mean(polygons, axis=1)
+
+
+
+def get_aligned_bbox(loc):
+    cx = 0.25 * (loc[0] + loc[2] + loc[4] + loc[6])
+    cy = 0.25 * (loc[1] + loc[3] + loc[5] + loc[7])
+    w = max(loc[0], loc[2], loc[4], loc[6]) - min(loc[0], loc[2], loc[4], loc[6])
+    h = max(loc[1], loc[3], loc[5], loc[7]) - min(loc[1], loc[3], loc[5], loc[7])
+    pos = np.array([cx, cy])
+    sz = np.array([w, h])
+    return pos, sz
+
+
+
+
+    return box_pos, box_sz
+
+
 def filter_bboxes_plus(rboxes, offset_thr=0.2, iou_thr=0.5, score_thr=0.0):
     """
     rboxes: list, contains: [(np.array(polygon), score),(), ... , ()]
@@ -62,7 +94,7 @@ def filter_bboxes_plus(rboxes, offset_thr=0.2, iou_thr=0.5, score_thr=0.0):
     filtered = []
     filtered.append(rboxes[0])
     best_box_poly = asPolygon(best_box.reshape(4,2)) # 1 polygon, N vertices, 2 coords per vertex
-    for n in range(1,num_boxes):
+    for n in range(1, num_boxes):
         next_box, next_box_score = rboxes[n]
         next_box_poly = asPolygon(next_box.reshape(4,2))
         union_area = best_box_poly.union(next_box_poly)
@@ -350,16 +382,18 @@ def siamese_track_plus(state, im, N, mask_enable=False, refine_enable=False, dev
     attmap = np.amax(attmap, axis=0)
     bboxes = np.zeros((6, N))
     # np.save('/data/Marina/attmap.npy', attmap)
+    target_pos_prev = target_pos.copy()
+    target_sz_prev = target_sz.copy()
     for idx in range(0, N):
         if idx == 0:
             best_pscore_id = np.argmax(pscore)
         best_pscore_id_tmp = np.argmax(pscore)
         pred_in_crop = delta[:, best_pscore_id_tmp] / scale_x
         lr = penalty[best_pscore_id_tmp] * score[best_pscore_id_tmp] * p.lr  # lr for OTB
-        res_x = pred_in_crop[0] + target_pos[0]
-        res_y = pred_in_crop[1] + target_pos[1]
-        res_w = target_sz[0] * (1 - lr) + pred_in_crop[2] * lr
-        res_h = target_sz[1] * (1 - lr) + pred_in_crop[3] * lr
+        res_x = pred_in_crop[0] + target_pos_prev[0]
+        res_y = pred_in_crop[1] + target_pos_prev[1]
+        res_w = target_sz_prev[0] * (1 - lr) + pred_in_crop[2] * lr
+        res_h = target_sz_prev[1] * (1 - lr) + pred_in_crop[3] * lr
         target_pos = np.array([res_x, res_y])
         target_sz = np.array([res_w, res_h])
         bboxes[0, idx] = target_pos[0]
@@ -439,11 +473,12 @@ def siamese_track_plus(state, im, N, mask_enable=False, refine_enable=False, dev
     state['target_pos'] = target_pos
     state['target_sz'] = target_sz
     state['score'] = bboxes[4, 0]
-    # state['mask'] = list_masks[0]
-    # state['ploygon'] = rboxes[0][0]
-    return state, list_masks, rboxes
+    state['mask'] = list_masks[0]
+    state['ploygon'] = rboxes[0][0]
+    return state, list_masks, rboxes, bboxes[0:4, :]
 
-def siamese_track(state, im, mask_enable=False, refine_enable=False, device='cpu', debug=False):
+
+def siamese_track(state, im, mask_enable=True, refine_enable=True, device='cpu', debug=False):
     global arrendatario
     p = state['p']
     net = state['net']
