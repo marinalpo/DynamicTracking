@@ -799,6 +799,8 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin):
 
 
     frames = np.arange(tin, tfin)
+    print('frames len', frames.shape)
+    print('frames:', frames)
     centr_gt = c_gt
     centr_pred = tracker.buffer_pos
     centr_corr = tracker.buffer_pos_corr
@@ -972,7 +974,8 @@ def plot_gt_cand_pred_box(tracker, c_gt, obj, norm, slow, tin, tfin):
     flags = tracker.predict_flag
 
     for f, flag in enumerate(flags):
-        ax[0].axvline(f + 1, color=(1, 0.8, 0), alpha=0.5, zorder=1)
-        ax[1].axvline(f + 1, color=(1, 0.8, 0), alpha=0.5, zorder=1)
+        for d in range(2):
+            if flag[d]:
+                ax[d].axvline(f+1, color=(1, 0.8, 0), alpha=0.7, zorder=1)
 
     plt.show()

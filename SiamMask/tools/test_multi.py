@@ -70,8 +70,8 @@ def get_best_bbox(bboxes, pred_pos, pred_ratio):
     ds_centr = np.sqrt((cxs - cx_pred)**2 + (cys - cy_pred)**2)
     ds_ratio = np.abs(ratios - pred_ratio)
 
-    print('ds_centroid:', ds_centr)
-    print('ds_ratio:', lambda_rat*ds_ratio)
+    # print('ds_centroid:', ds_centr)
+    # print('ds_ratio:', lambda_rat*ds_ratio)
 
     j = ds_centr + lambda_rat*ds_ratio
     min_idx = np.argmin(j)
@@ -489,7 +489,10 @@ def siamese_track_plus(state, im, N, mask_enable=False, refine_enable=False, dev
     state['target_sz'] = target_sz
     state['score'] = bboxes[4, 0]
     state['mask'] = list_masks[0]
-    state['ploygon'] = rboxes[0][0]
+    if not rboxes:
+        state['ploygon'] = 0
+    else:
+        state['ploygon'] = rboxes[0][0]
     return state, list_masks, rboxes, bboxes[0:4, :]
 
 

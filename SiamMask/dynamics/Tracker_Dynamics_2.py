@@ -87,7 +87,6 @@ class TrackerDyn_2:
             self.buffer_sz = np.vstack((self.buffer_sz, np.reshape(sz, (1, 2))))
             self.buffer_ratio = np.append(self.buffer_ratio, (sz[0]/sz[1]))
 
-
         # Compute distances, etas, classify and predict
         if self.t > self.T0:
 
@@ -120,12 +119,12 @@ class TrackerDyn_2:
 
     def predict_ratio(self):
         data = self.buffer_ratio[self.t - self.T0_ratio - 1:self.t - 1].reshape(-1, 1)
-        print('data to predict ratio:', data)
+        # print('data to predict ratio:', data)
         x = np.arange(1, self.T0_ratio+1).reshape(-1, 1)
         regr = linear_model.LinearRegression()
         regr.fit(x, data)
         pred_ratio = regr.predict(np.asarray((self.T0_ratio+1)).reshape(-1, 1))
-        print('predicted ratio:', pred_ratio)
+        # print('predicted ratio:', pred_ratio)
         return pred_ratio
 
     def update_bbox(self, pos, sz):
