@@ -19,7 +19,7 @@ from utils_dyn.utils_dynamics import *
 
 class TrackerDyn_2:
 
-    def __init__(self, T0, t_init=1):
+    def __init__(self, T0, t_init=1, eta_max_pred=10, both=True):
 
         # Parameters
         self.T0 = T0
@@ -32,7 +32,8 @@ class TrackerDyn_2:
         self.slow = False  # If true: Slow(but Precise), if false: Fast
         self.norm = True  # If true: Norm, if false: MSE
         self.eta_max_clas = 1
-        self.eta_max_pred = 10
+        self.eta_max_pred = eta_max_pred
+        self.both = both
 
         # Thresholds to base the classification decisions on
         self.th_jbld = 0.5  # 0.3
@@ -45,6 +46,8 @@ class TrackerDyn_2:
         self.buffer_pos = np.zeros([self.T0, 2])
         self.buffer_pos_corr = np.zeros([self.T0, 2])  # CORRECTED
         self.buffer_pos_m = np.zeros([self.T0 - 1, 2])  # Means of the data
+        self.buffer_pred = np.zeros([self.T0, 2])
+
 
         self.buffer_sz = np.zeros([self.T0, 2])
         self.buffer_ratio = np.zeros(self.T0)
@@ -79,11 +82,13 @@ class TrackerDyn_2:
         if self.t <= self.T0:
             self.buffer_pos[self.t - 1, :] = np.reshape(pos, (1, 2))
             self.buffer_pos_corr[self.t - 1, :] = np.reshape(pos, (1, 2))
+            self.buffer_pred[self.t - 1, :] = np.reshape(pos, (1, 2))
             self.buffer_sz[self.t - 1, :] = np.reshape(sz, (1, 2))
             self.buffer_ratio[self.t-1] = sz[0]/sz[1]
         else:
             self.buffer_pos = np.vstack((self.buffer_pos, np.reshape(pos, (1, 2))))
             self.buffer_pos_corr = np.vstack((self.buffer_pos_corr, np.reshape(pos, (1, 2))))
+            self.buffer_pred = np.vstack((self.buffer_pred, np.reshape(pos, (1, 2))))
             self.buffer_sz = np.vstack((self.buffer_sz, np.reshape(sz, (1, 2))))
             self.buffer_ratio = np.append(self.buffer_ratio, (sz[0]/sz[1]))
 
@@ -94,24 +99,29 @@ class TrackerDyn_2:
 
             c = self.classify()
 
-            # TODO: PREDICT BOTH
-            if c[0] or c[1]:
-                print('Lets predict BOTH!')
-                pred_pos[0] = self.predict(0)
-                self.buffer_pos_corr[self.t - 1, 0] = pred_pos[0]
-                pred_pos[1] = self.predict(1)
-                self.buffer_pos_corr[self.t - 1, 1] = pred_pos[1]
-                pred_ratio = self.predict_ratio()
-                self.buffer_ratio[self.t-1] = pred_ratio
+            if self.both:
+                if c[0] or c[1]:
+                    print('Lets predict BOTH!')
+                    pred_pos[0] = self.predict(0)
+                    self.buffer_pos_corr[self.t - 1, 0] = pred_pos[0]
+                    pred_pos[1] = self.predict(1)
+                    self.buffer_pos_corr[self.t - 1, 1] = pred_pos[1]
+                    pred_ratio = self.predict_ratio()
+                    self.buffer_ratio[self.t-1] = pred_ratio
 
-                # if c[0]:
-                #     print('Lets predict x!')
-                #     pred_pos[0] = self.predict(0)
-                #     self.buffer_pos_corr[self.t - 1, 0] = pred_pos[0]
-                # if c[1]:
-                #     print('Lets predict y!')
-                #     pred_pos[1] = self.predict(1)
-                #     self.buffer_pos_corr[self.t - 1, 1] = pred_pos[1]
+                    self.buffer_pred[self.t - 1, 0] = pred_pos[0]
+                    self.buffer_pred[self.t - 1, 1] = pred_pos[1]
+            else:
+                if c[0]:
+                    print('Lets predict x!')
+                    pred_pos[0] = self.predict(0)
+                    self.buffer_pos_corr[self.t - 1, 0] = pred_pos[0]
+                    self.buffer_pred[self.t - 1, 0] = pred_pos[0]
+                if c[1]:
+                    print('Lets predict y!')
+                    pred_pos[1] = self.predict(1)
+                    self.buffer_pos_corr[self.t - 1, 1] = pred_pos[1]
+                    self.buffer_pred[self.t - 1, 1] = pred_pos[1]
 
         self.t += 1
         # print('Predicted:', pred_pos)

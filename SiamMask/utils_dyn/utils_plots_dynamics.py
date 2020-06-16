@@ -798,11 +798,11 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin):
     norm_name = ['MSE', 'NORM']
 
 
-    frames = np.arange(tin, tfin)
-    print('frames len', frames.shape)
-    print('frames:', frames)
+    frames = np.arange(tin, tfin+1)
+    # print('frames:', frames)
     centr_gt = c_gt
-    centr_pred = tracker.buffer_pos
+    centr_prop = tracker.buffer_pos
+    centr_pred = tracker.buffer_pred
     centr_corr = tracker.buffer_pos_corr
     etas = tracker.eta_norm_dif
     jbld = tracker.jbld_pos
@@ -829,19 +829,28 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin):
             ax[i, j].grid(axis='x', zorder=1, alpha=0.4)
 
     fig.suptitle('Object:' + str(obj))
+
     # print('shape frames:', frames.shape)
-    # print(centr_corr[:, 0].shape)
+    # print('shape pred', centr_pred[:, 0].shape)
+    # print('shape corr', centr_corr[:, 0].shape)
 
     ax[0, 0].set_title('Position Centroid x')
-    ax[0, 0].scatter(frames, centr_pred[:, 0], c='r', s=s_pred, edgecolors='k', alpha=0.6, label='Predictions',
+
+    ax[0, 0].scatter(frames, centr_prop[:, 0], c='r', s=s_pred, edgecolors='k', alpha=0.6, label='Proposed',
                      zorder=3)
+    ax[0, 0].scatter(frames, centr_pred[:, 0], c='y', s=s_pred, edgecolors='k', alpha=0.6, label='Predicted',
+                      zorder=2)
     ax[0, 0].scatter(frames, centr_corr[:, 0], c='k', s=s_pred, edgecolors='k', alpha=0.6, label='Corrected',
                       zorder=2)
+
+    # print('y size:', c_gt[:, 0].shape)
     ax[0, 0].scatter(frames, c_gt[:, 0], c='r', s=s_gt, alpha=0.2, label='GT', zorder=3)
     ax[0, 0].legend()
 
     ax[0, 1].set_title('Position Centroid y')
-    ax[0, 1].scatter(frames, centr_pred[:, 1], c='g', s=s_pred, edgecolors='k', alpha=0.6, label='Predictions',
+    ax[0, 1].scatter(frames, centr_prop[:, 1], c='g', s=s_pred, edgecolors='k', alpha=0.6, label='Proposed',
+                     zorder=3)
+    ax[0, 1].scatter(frames, centr_pred[:, 1], c='y', s=s_pred, edgecolors='k', alpha=0.6, label='Predicted',
                      zorder=3)
     ax[0, 1].scatter(frames, centr_corr[:, 1], c='k', s=s_pred, edgecolors='k', alpha=0.6, label='Corrected',
                       zorder=2)
@@ -913,7 +922,7 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin):
                         a = 1
                     else:
                         a = 0.4
-                    ax[i, d].axvline(f+1, color=(1, 0.8, 0), alpha=a, zorder=1)
+                    ax[i, d].axvline(f+tin, color=(1, 0.8, 0), alpha=a, zorder=1)
 
     plt.show()
 
@@ -923,9 +932,10 @@ def plot_gt_cand_pred_box(tracker, c_gt, obj, norm, slow, tin, tfin):
     norm_name = ['MSE', 'NORM']
 
 
-    frames = np.arange(tin, tfin)
+    frames = np.arange(tin, tfin+1)
     centr_gt = c_gt
-    centr_pred = tracker.buffer_pos
+    centr_prop = tracker.buffer_pos
+    centr_pred = tracker.buffer_pred
     centr_corr = tracker.buffer_pos_corr
     etas = tracker.eta_norm_dif
     jbld = tracker.jbld_pos
@@ -955,7 +965,9 @@ def plot_gt_cand_pred_box(tracker, c_gt, obj, norm, slow, tin, tfin):
     # print(centr_corr[:, 0].shape)
 
     ax[0].set_title('Position Centroid x')
-    ax[0].scatter(frames, centr_pred[:, 0], c='r', s=s_pred, edgecolors='k', alpha=0.6, label='Predictions',
+    ax[0].scatter(frames, centr_prop[:, 0], c='r', s=s_pred, edgecolors='k', alpha=0.6, label='Proposed',
+                     zorder=3)
+    ax[0].scatter(frames, centr_pred[:, 0], c='y', s=s_pred, edgecolors='k', alpha=0.6, label='Predicted',
                      zorder=3)
     ax[0].scatter(frames, centr_corr[:, 0], c='k', s=s_pred, edgecolors='k', alpha=0.6, label='Corrected',
                       zorder=2)
@@ -963,7 +975,9 @@ def plot_gt_cand_pred_box(tracker, c_gt, obj, norm, slow, tin, tfin):
     ax[0].legend()
 
     ax[1].set_title('Position Centroid y')
-    ax[1].scatter(frames, centr_pred[:, 1], c='g', s=s_pred, edgecolors='k', alpha=0.6, label='Predictions',
+    ax[1].scatter(frames, centr_prop[:, 1], c='g', s=s_pred, edgecolors='k', alpha=0.6, label='Proposed',
+                     zorder=3)
+    ax[1].scatter(frames, centr_pred[:, 1], c='y', s=s_pred, edgecolors='k', alpha=0.6, label='Predicted',
                      zorder=3)
     ax[1].scatter(frames, centr_corr[:, 1], c='k', s=s_pred, edgecolors='k', alpha=0.6, label='Corrected',
                       zorder=2)
@@ -976,6 +990,6 @@ def plot_gt_cand_pred_box(tracker, c_gt, obj, norm, slow, tin, tfin):
     for f, flag in enumerate(flags):
         for d in range(2):
             if flag[d]:
-                ax[d].axvline(f+1, color=(1, 0.8, 0), alpha=0.7, zorder=1)
+                ax[d].axvline(f+tin, color=(1, 0.8, 0), alpha=0.7, zorder=1)
 
     plt.show()

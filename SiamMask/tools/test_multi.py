@@ -7,6 +7,7 @@ from __future__ import division
 import argparse
 import logging
 import numpy as np
+import motmetrics as mm
 import math
 import cv2
 from PIL import Image
@@ -52,6 +53,61 @@ parser.add_argument('--cpu', action='store_true', help='cpu mode')
 parser.add_argument('--debug', action='store_true', help='debug mode')
 
 
+def compute_metrics(gt_df, pred_df, th=0.8):
+    # Sort dataframes
+    gt_df = gt_df.sort_values(['FrameID', 'ObjectID'])
+    pred_df = pred_df.sort_values(['FrameID', 'ObjectID'])
+
+    num_frames = pred_df.FrameID.max()
+    acc = mm.MOTAccumulator(auto_id=True)
+    acc2 = mm.MOTAccumulator(auto_id=True)
+
+    for f in range(1, num_frames + 1):
+        # Get obj ids
+        this_frame_gt_ids = np.asarray(gt_df[(gt_df.FrameID == f) & (gt_df.isActive == 1)]['ObjectID'])
+        this_frame_gt = gt_df[(gt_df.FrameID == f) & (gt_df.isActive == 1)]
+
+        activs = this_frame_gt.ObjectID.unique()
+        this_frame_hyp = pred_df[(pred_df.FrameID == f) & (pred_df.ObjectID.isin(activs))]
+        this_frame_hyp_ids = np.asarray(pred_df[(pred_df.FrameID == f) & (pred_df.ObjectID.isin(activs))]['ObjectID'])
+
+        GT2 = np.asarray(this_frame_gt.loc[:, ['cx', 'cy']])
+        HYP2 = np.asarray(this_frame_hyp.loc[:, ['cx', 'cy']])
+        if f == 1:
+            EDs = np.sqrt((GT2[:, 0] - HYP2[:, 0]) ** 2 + (GT2[:, 1] - HYP2[:, 1]) ** 2)
+        else:
+            D = np.sqrt((GT2[:, 0] - HYP2[:, 0]) ** 2 + (GT2[:, 1] - HYP2[:, 1]) ** 2)
+            EDs = np.hstack((EDs, D))
+
+        GT = np.asarray(this_frame_gt.loc[:, ['x_topleft', 'y_topleft', 'Width', 'Height']])
+        HYP = np.asarray(this_frame_hyp.loc[:, ['x_topleft', 'y_topleft', 'Width', 'Height']])
+        if f == 1:
+            c = mm.distances.iou_matrix(GT, HYP, max_iou=1)
+            IOUs = 1 - np.diagonal(c)
+        else:
+            c = mm.distances.iou_matrix(GT, HYP, max_iou=1)
+            IOUs = np.hstack((IOUs, 1 - np.diagonal(c)))
+
+        acc.update(
+            this_frame_gt_ids,  # Ground truth objects in this frame
+            this_frame_hyp_ids,  # Detector hypotheses in this frame
+            mm.distances.iou_matrix(GT, HYP, max_iou=th)  # 0.1 Molt restrictiu
+        )
+
+    mh = mm.metrics.create()
+    summary = mh.compute(acc,
+                         metrics=['mota', 'motp', 'num_matches', 'num_misses', 'num_false_positives', 'num_switches',
+                                  'precision', 'num_predictions', 'num_objects'], name='acc')
+
+    mota = np.around(summary['mota'] * 100, 2)
+    motp = np.around((1 - summary['motp']) * 100, 2)
+    mP = np.around(summary['precision'] * 100, 2)
+    mED = np.around(np.mean(EDs), 2)
+    mIOU = np.around(np.mean(IOUs) * 100, 2)
+
+    return mED, mIOU, mP[0], mota[0], motp[0]
+
+
 def get_best_bbox(bboxes, pred_pos, pred_ratio):
     # bboxes shape: (4, num_cand)
 
@@ -65,23 +121,22 @@ def get_best_bbox(bboxes, pred_pos, pred_ratio):
     cxs = bboxes[0, :]
     cys = bboxes[1, :]
 
-    ratios = bboxes[2, :]/bboxes[3, :]
+    # ratios = bboxes[2, :]/bboxes[3, :]
 
     ds_centr = np.sqrt((cxs - cx_pred)**2 + (cys - cy_pred)**2)
-    ds_ratio = np.abs(ratios - pred_ratio)
+    # ds_ratio = np.abs(ratios - pred_ratio)
 
     # print('ds_centroid:', ds_centr)
     # print('ds_ratio:', lambda_rat*ds_ratio)
 
-    j = ds_centr + lambda_rat*ds_ratio
+    # j = ds_centr + lambda_rat*ds_ratio
+    j = ds_centr
     min_idx = np.argmin(j)
     w = bboxes[2, :]
     h = bboxes[3, :]
     pred_pos_new = np.array([cxs[min_idx], cys[min_idx]])
     pred_sz_new = np.array([w[min_idx], h[min_idx]])
-    return pred_pos_new, pred_sz_new
-
-
+    return pred_pos_new, pred_sz_new, min_idx
 
 
 def get_aligned_bbox(loc):
@@ -94,12 +149,7 @@ def get_aligned_bbox(loc):
     return pos, sz
 
 
-
-
-    return box_pos, box_sz
-
-
-def filter_bboxes_plus(rboxes, offset_thr=0.2, iou_thr=0.5, score_thr=0.0):
+def filter_bboxes_plus(rboxes, iou_thr=0.5, score_thr=0.2):
     """
     rboxes: list, contains: [(np.array(polygon), score),(), ... , ()]
     """
@@ -191,9 +241,6 @@ def im_to_torch(img):
     img = np.transpose(img, (2, 0, 1))  # C*H*W
     img = to_torch(img).float()
     return img
-
-
-arrendatario = 0
 
 
 def get_subwindow_tracking(im, pos, model_sz, original_sz, avg_chans, out_mode='torch'):
@@ -415,7 +462,7 @@ def siamese_track_plus(state, im, N, mask_enable=False, refine_enable=False, dev
         bboxes[1, idx] = target_pos[1]
         bboxes[2, idx] = target_sz[0]
         bboxes[3, idx] = target_sz[1]
-        bboxes[4, idx] = pscore[best_pscore_id_tmp]  # BUG: This should be pscore[best_...]?
+        bboxes[4, idx] = pscore[best_pscore_id_tmp]
         bboxes[5, idx] = best_pscore_id_tmp
         pscore[best_pscore_id_tmp] = 0.0
     # Tot de la millor pscore (la guanyadora original)
@@ -425,13 +472,15 @@ def siamese_track_plus(state, im, N, mask_enable=False, refine_enable=False, dev
     rboxes = []
     deltas = []
     list_masks = []
+    intersect_of_bboxes_rboxes = np.zeros((N),dtype=np.bool)
     for idx in range(0, N):
         if mask_enable:
             best_pscore_id_mask = np.unravel_index(int(bboxes[5, idx]), (5, p.score_size, p.score_size))
             delta_x, delta_y = best_pscore_id_mask[2], best_pscore_id_mask[1]
             # delta_x and delta_y are the selected coordinates in the volume
             # NOTE: Nomes agafo boxes de deltes noves, no vull coses de la mateixa delta
-            if ((delta_x, delta_y) not in deltas):
+            #if ((delta_x, delta_y) not in deltas):
+            if True:
                 # print("delta: (", delta_x, ", ", delta_y, ")")
                 deltas.append((delta_x, delta_y))
                 if refine_enable:
@@ -475,6 +524,7 @@ def siamese_track_plus(state, im, N, mask_enable=False, refine_enable=False, dev
                     rbox_in_img = prbox
                     box_score = bboxes[4, idx]
                     rboxes.append([rbox_in_img, box_score])
+                    intersect_of_bboxes_rboxes[idx] = 1
                 else:  # empty mask
                     location = cxy_wh_2_rect(target_pos, target_sz)
                     rbox_in_img = np.array([[location[0], location[1]],
@@ -493,8 +543,10 @@ def siamese_track_plus(state, im, N, mask_enable=False, refine_enable=False, dev
         state['ploygon'] = 0
     else:
         state['ploygon'] = rboxes[0][0]
-    return state, list_masks, rboxes, bboxes[0:4, :]
-
+    new_bboxes = bboxes[0:4, np.ix_(intersect_of_bboxes_rboxes)]
+    new_bboxes = new_bboxes.squeeze()
+    # return state, list_masks, rboxes, bboxes[0:4, :]
+    return state, list_masks, rboxes, new_bboxes
 
 def siamese_track(state, im, mask_enable=True, refine_enable=True, device='cpu', debug=False):
     global arrendatario

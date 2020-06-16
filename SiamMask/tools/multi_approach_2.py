@@ -30,13 +30,16 @@ columns_location = ['FrameID', 'ObjectID', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', '
 dataset_name = ['MOT', 'SMOT', 'Stanford']
 columns_names = ['FrameID',	'ObjectID',	'x_topleft',	'y_topleft',	'Width',	'Height',	'isActive',	'isOccluded', 'cx', 'cy']
 max_num_obj = 10  # Maximum number of objects being tracked
+
 # Tracker Parameters
 correct_with_dynamics = False
-draw_mask = False
-draw_proposal = True
-draw_candidates = False
 draw_GT = True
-filter_boxes = False
+draw_proposal = True
+draw_candidates = True
+draw_pred = True
+
+draw_mask = False
+filter_boxes = True
 eps = 1  # Noise variance
 metric = 0  # if 0: JBLD, if 1: JKL
 W = 3  # Smoothing window length
@@ -44,7 +47,7 @@ slow = False  # If true: Slow(but Precise), if false: Fast
 norm = True  # If true: Norm, if false: MSE
 
 T0 = 11  # System memory (best: 11)
-num_frames = 154  # 154 for Acrobats
+num_frames = 150  # 150 for Acrobats
 N = 30  # Maximum number of candidates returned by the tracking (15)
 k = 3  # Maximum number of candidates
 # after filtering NMS
@@ -59,14 +62,18 @@ img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_p
 
 # TODO: Si el volem nomes dun objecte
 single_object = True
-obj = 1
+obj = 5
 
 # Loads init file, deletes targets if there are more than max_num_obj in the requested frames
 init, total_obj = create_init(init_path, num_frames, max_num_obj)
-
 pred_df = init.copy()
 gt_df = pd.read_csv(gt_path, sep=',', header=None)
 gt_df.columns = columns_names
+gt_df = gt_df[gt_df.FrameID <= num_frames]
+
+print('\ntotal obj:', total_obj, '\n')
+
+
 colors = create_colormap_hsv(len(total_obj))
 
 if single_object:
@@ -74,10 +81,9 @@ if single_object:
     init = init[init.ObjectID == obj]
     gt_df = gt_df[gt_df.ObjectID == obj]
     c_gt = gt_df.loc[:, ['cx', 'cy']].values
-    print('init:\n', init)
+    gt_df = gt_df[gt_df.ObjectID == obj]
 
-
-print('Ojects to be tracked:', total_obj)
+print('init:\n', init)
 
 if __name__ == '__main__':
     toc = 0  # Timer
@@ -92,7 +98,7 @@ if __name__ == '__main__':
     # print('CUDA device:', torch.cuda.current_device())
 
     # Initialize a SiamMask model for each object ID
-    print('Initializing', len(total_obj), 'tracker(s)...')
+    # print('Initializing', len(total_obj), 'tracker(s)...')
     tracker = {}
     dynamics = {}
     for obj in total_obj:
@@ -104,7 +110,7 @@ if __name__ == '__main__':
         siammask.eval().to(device)
         tracker[obj] = siammask
 
-        print('Tracker:', obj, ' Initialized')
+        # print('Tracker:', obj, ' Initialized')
 
     # Parse Image files
     img_files = sorted(glob.glob(join(img_path, '*.jp*')))[000000:num_frames]
@@ -152,7 +158,6 @@ if __name__ == '__main__':
 
                 tracker_dyn = TrackerDyn_2(T0=T0, t_init=f)
                 c, pred_pos, pred_ratio = tracker_dyn.update(target_pos, target_sz, 1)
-                print('Initialized Tracker Dyn Module')
 
                 nested_obj = {'target_pos': target_pos, 'target_sz': np.array([w, h]),
                               'init_frame': f, 'siammask': tracker[ob], 'tracker': tracker_dyn}
@@ -175,7 +180,7 @@ if __name__ == '__main__':
                 tracker_dyn = value['tracker']
 
                 # col = colors[np.where(total_obj == key)[0][0]]
-                col = colors[obj]
+                col = colors[key-1]
 
                 state, masks, rboxes_cand, bboxes = siamese_track_plus(state=value['state'], im=im_track, N=N,
                                                                 mask_enable=True,
@@ -186,38 +191,22 @@ if __name__ == '__main__':
                 score = state['score']
                 poly = state['ploygon']
 
+                if draw_proposal:
+                    cx = target_pos[0]
+                    cy = target_pos[1]
+                    w = target_sz[0]
+                    h = target_sz[1]
+                    x_tl = cx - w / 2
+                    y_tl = cy - h / 2
+                    cv2.rectangle(im, (int(x_tl), int(y_tl)), (int(x_tl + w), int(y_tl + h)), (255, 255, 255), 3)
+
                 if draw_candidates:
                     num_cand = bboxes.shape[1]
                     for i in range(num_cand):
                         cx, cy = bboxes[0, i], bboxes[1, i]
                         w, h = bboxes[2, i], bboxes[3, i]
                         # cv2.circle(im, (int(cx), int(cy)), 3, (0, 254, 0), 3)
-                        cv2.rectangle(im, (int(cx - w / 2), int(cy - h / 2)), (int(cx + w / 2), int(cy + h / 2)), (0, 254, 0), 1)
-
-
-                # Note: Draw bounding boxes and text
-                location = cxy_wh_2_rect(target_pos, target_sz)
-                rbox_in_img = np.array([[location[0], location[1]],
-                                        [location[0] + location[2], location[1]],
-                                        [location[0] + location[2], location[1] + location[3]],
-                                        [location[0], location[1] + location[3]]])
-                location = rbox_in_img.flatten()
-                cv2.polylines(im, [np.int0(location).reshape((-1, 1, 2))], True, col, 3)
-                # cv2.putText(im, str(key), (int(target_pos[0]-5), int(target_pos[1]-5)), font,
-                #             font_size * 1, col, 2, cv2.LINE_AA)
-                cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, col, 3)
-
-                if draw_GT:
-                    # location_gt = get_location_gt(gt_df, key, f)
-                    line = gt_df[(gt_df.FrameID == f) & (gt_df.ObjectID == key)]
-                    gt_sz = np.asarray((line.Width.item(), line.Height.item()))
-                    gt_pos = np.asarray((line.cx.item(), line.cy.item()))
-                    location_gt = cxy_wh_2_rect(gt_pos, gt_sz)
-                    rbox_gt = np.array([[location_gt[0], location_gt[1]],
-                                            [location_gt[0] + location_gt[2], location_gt[1]],
-                                            [location_gt[0] + location_gt[2], location_gt[1] + location_gt[3]],
-                                            [location_gt[0], location_gt[1] + location_gt[3]]])
-                    cv2.polylines(im, [np.int0(rbox_gt.flatten()).reshape((-1, 1, 2))], True, col, 1)
+                        cv2.rectangle(im, (int(cx - w / 2), int(cy - h / 2)), (int(cx + w / 2), int(cy + h / 2)), (254, 254, 254), 1)
 
 
                 bbox_ratio = target_pos[0]/target_pos[1]
@@ -227,20 +216,11 @@ if __name__ == '__main__':
                     c, pred_pos, pred_ratio = tracker_dyn.update(target_pos, target_sz, score)
 
                     if c[0] or c[1]:
-                        # TODO: Buscar el closest candidate
                         # Remove winner bbox
                         bboxes = bboxes[:, 1:]
-                        pred_pos, pred_sz = get_best_bbox(bboxes, pred_pos, pred_ratio)
-                        # print('Closest:', pred_pos)
-                        # print('new bbox:', pred_sz)
 
+                        pred_pos, pred_sz, idx = get_best_bbox(bboxes, pred_pos, pred_ratio)
                         tracker_dyn.update_bbox(pred_pos, pred_sz)
-
-                        # Plot corrected
-                        cx, cy = pred_pos
-                        w, h = pred_sz
-                        # cv2.circle(im, (int(cx), int(cy)), 3, (0, 254, 0), 3)
-                        cv2.rectangle(im, (int(cx - w / 2), int(cy - h / 2)), (int(cx + w / 2), int(cy + h / 2)), (0, 254, 254), 3)
 
                         state['target_pos'] = pred_pos
                         state['target_sz'] = pred_sz
@@ -248,17 +228,44 @@ if __name__ == '__main__':
 
                 value['state'] = state
 
+                cx = state['target_pos'][0]
+                cy = state['target_pos'][1]
+                w = state['target_sz'][0]
+                h = state['target_sz'][1]
+                x_tl = cx - w/2
+                y_tl = cy - h/2
+
                 # Append predictions to pred DF
-                # pred_df = append_pred(pred_df, f, key, target_pos[0]-target_sz[0]/2, target_pos[1]-target_sz[1]/2,
-                #                       target_sz[0], target_sz[1], target_pos[0], target_pos[1])
+                # x_topleft, y_topleft, w, h, cx, cy
+                pred_df = append_pred(pred_df, f, key, x_tl, y_tl, w, h, cx, cy)
+
+                if draw_pred:
+                    cv2.rectangle(im, (int(x_tl), int(y_tl)), (int(x_tl + w), int(y_tl + h)), col, 3)
+                    cv2.circle(im, (int(x_tl), int(y_tl)), 3, col, 3)
+
+                if draw_GT:
+                    line = gt_df[(gt_df.FrameID == f) & (gt_df.ObjectID == key)]
+                    gt_sz = np.asarray((line.Width.item(), line.Height.item()))
+                    gt_pos = np.asarray((line.cx.item(), line.cy.item()))
+                    cx_gt = gt_pos[0]
+                    cy_gt = gt_pos[1]
+                    w_gt = gt_sz[0]
+                    h_gt = gt_sz[1]
+                    x_tl_gt = cx_gt - w_gt / 2
+                    y_tl_gt = cy_gt - h_gt / 2
+                    cv2.rectangle(im, (int(x_tl_gt), int(y_tl_gt)), (int(x_tl_gt + w_gt), int(y_tl_gt + h_gt)), col, 1)
+                    cv2.circle(im, (int(x_tl_gt), int(y_tl_gt)), 3, col, 1)
 
 
             cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
+            toc += cv2.getTickCount() - tic
 
-    toc += cv2.getTickCount() - tic
+    toc /= cv2.getTickFrequency()
+    fps = f / toc
 
-    # print('pred_df:', pred_df)
-    # pred_df.to_csv('/data/results/pred_df_acrobats.txt', header=None, index=None, sep=',')
+    # print('pred_df:\n', pred_df)
+    pred_df.to_csv('/data/results/pred_df_acrobats.txt', header=None, index=None, sep=',')
+    gt_df.to_csv('/data/results/gt_df_acrobats.txt', header=None, index=None, sep=',')
 
     positions_path = '/data/Marina/positions/'
 
@@ -271,33 +278,26 @@ if __name__ == '__main__':
     with open(positions_path+'target_pos_dict.obj', 'wb') as fil:
         pickle.dump(target_pos_dict, fil)
 
-    toc /= cv2.getTickFrequency()
-    fps = f / toc
+
 
     print('SiamMask Time: {:02.1f}s Speed: {:3.1f}fps)'.format(toc, fps))
-    print('\nResults (frames with bboxes) saved in:', results_path)
 
     # TODO: Metrics computation
-    mota = 0
-    motp = 0
-    cd = 0
-
-    ######
-    mota_siam = 0
-    motp_siam = 0
-    cd_siam = 0
+    mED, mIOU, mP, mota, motp = compute_metrics(gt_df, pred_df, th=0.8)
 
     print('\n------------------- MEASURES REPORT: -------------------')
-    print('MOTA:', mota, '   (vs. MOTA SiamMask: ', mota_siam, ' )')
-    print('MOTP:', motp, '   (vs. MOTP SiamMask: ', motp_siam, ' )')
-    print('CD:  ', cd, '   (vs. CD SiamMask:   ', cd_siam, ' )')
+    print('mED:', mED, 'pixels')
+    print('mIOU:', mIOU, '%')
+    print('mP(@0.8):', mP, '%')
+    print('MOTA(@0.8):', mota, '%')
+    print('MOTP(@0.8):', motp, '%')
     print('--------------------------------------------------------\n')
     #
     #
-    tin = tracker_dyn.t_init
-    tfin = num_frames + 1
-    print('tin', tin, 'tfin', tfin)
-    c_gt = c_gt[tin:tfin, :]
-    print('cgt len:', c_gt.shape)
-    # plot_jbld_eta_score_4(tracker_dyn, c_gt, obj, norm, slow, tin, tfin)
-    # plot_gt_cand_pred_box(tracker_dyn, c_gt, obj, norm, slow, tin, tfin)
+    if single_object and correct_with_dynamics:
+        tin = tracker_dyn.t_init
+        tfin = num_frames
+        c_gt = c_gt[tin-1:tfin+1, :]
+        print('tin', tin, 'tfin', tfin)
+        plot_jbld_eta_score_4(tracker_dyn, c_gt, obj, norm, slow, tin, tfin)
+        plot_gt_cand_pred_box(tracker_dyn, c_gt, obj, norm, slow, tin, tfin)
