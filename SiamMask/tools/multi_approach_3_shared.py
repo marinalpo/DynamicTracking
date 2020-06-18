@@ -35,14 +35,21 @@ max_num_obj = 10  # Maximum number of objects being tracked
 correct_with_dynamics = True
 draw_GT = True
 draw_proposal = True
-draw_candidates = False
+draw_candidates = True
+draw_corrected = True
 draw_pred = True
-draw_mask = False
 
+draw_mask = False
+filter_boxes = True
+eps = 1  # Noise variance
+metric = 0  # if 0: JBLD, if 1: JKL
+W = 3  # Smoothing window length
+slow = False  # If true: Slow(but Precise), if false: Fast
+norm = True  # If true: Norm, if false: MSE
 
 T0 = 11  # System memory (best: 11)
 num_frames = 150  # 150 for Acrobats
-N = 30  # Maximum number of candidates returned by the tracking (15)
+N = 75  # Maximum number of candidates returned by the tracking (15)
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
 sequence = 'acrobats'  # SMOT: 'acrobats' or 'juggling'
 video = 'video0'
@@ -54,7 +61,7 @@ img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_p
 
 # TODO: Si el volem nomes dun objecte
 single_object = False
-obj = 1
+obj = 2
 
 # Loads init file, deletes targets if there are more than max_num_obj in the requested frames
 init, total_obj = create_init(init_path, num_frames, max_num_obj)
@@ -115,12 +122,14 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         for f, im in enumerate(ims):
+            print('pred_df shape:', pred_df.shape, '\n\n')
+            tic = cv2.getTickCount()
             f = f + 1  # Begins with image 000001.jpg
             print('------------------------ Frame:', f, '----------------------------')
             im_init = im.copy()
             im_track = im.copy()
-            tic = cv2.getTickCount()
-            # cv2.putText(im, 'Frame: ' + str(f), (10, 60), font, font_size * 0.75, (255, 255, 255), 2, cv2.LINE_AA)
+
+            cv2.putText(im, 'Approach 3 - shared', (10, 30), font, font_size * 0.75, (255, 255, 255), 2, cv2.LINE_AA)
 
             # Get number of objects that are initialized in this frame
             init_frame = init[init.FrameID == f]
@@ -148,11 +157,13 @@ if __name__ == '__main__':
                 torch.cuda.set_device(device)
 
 
+                # tracker_dyn = TrackerDyn_2(T0=T0, t_init=f, eta_max_pred=20, both=False)
                 tracker_dyn = TrackerDyn_2(T0=T0, t_init=f)
                 c, pred_pos, pred_ratio = tracker_dyn.update(target_pos, target_sz, 1)
 
                 nested_obj = {'target_pos': target_pos, 'target_sz': np.array([w, h]),
-                              'init_frame': f, 'siammask': tracker[ob], 'tracker': tracker_dyn}
+                              'init_frame': f, 'siammask': tracker[ob], 'tracker': tracker_dyn, 'predict': False,
+                              'pred_pos': np.array(2)}
 
                 state, z = siamese_init(ob, im_init, nested_obj['target_pos'], nested_obj['target_sz'],
                                         nested_obj['siammask'], cfg['hp'], device=device)
@@ -162,77 +173,21 @@ if __name__ == '__main__':
                 cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (255, 255, 0), 5)
                 cv2.putText(im, 'init obj:'+str(ob), (int(x), int(y) - 7), font, font_size * 0.75, (255, 255, 0), 2, cv2.LINE_AA)
 
+
+            count = True
+            # TODO: 1r LOOP
+            print('FIRST LOOP:')
             for key, value in objects.items():
                 if value['init_frame'] == f:
                     print('Not going to track object', key, 'at this frame')
                     continue
 
-                print('Tracking object', key)
+                print('Tracking object', key, '------------------------')
                 state = value['state']
                 tracker_dyn = value['tracker']
 
                 # col = colors[np.where(total_obj == key)[0][0]]
                 col = colors[key-1]
-
-                state, bboxes = siamese_track_ali(state=value['state'], im=im_track, N=N,
-                                                                mask_enable=False,
-                                                                refine_enable=False, device=device)
-                target_sz = state['target_sz']
-                target_pos = state['target_pos']
-                score = state['score']
-
-                if draw_proposal:
-                    cx = target_pos[0]
-                    cy = target_pos[1]
-                    w = target_sz[0]
-                    h = target_sz[1]
-                    x_tl = cx - w / 2
-                    y_tl = cy - h / 2
-                    cv2.rectangle(im, (int(x_tl), int(y_tl)), (int(x_tl + w), int(y_tl + h)), (255, 255, 255), 3)
-
-                if draw_candidates:
-                    num_cand = bboxes.shape[1]
-                    for i in range(num_cand):
-                        cx, cy = bboxes[0, i], bboxes[1, i]
-                        w, h = bboxes[2, i], bboxes[3, i]
-                        # cv2.circle(im, (int(cx), int(cy)), 3, (0, 254, 0), 3)
-                        cv2.rectangle(im, (int(cx - w / 2), int(cy - h / 2)), (int(cx + w / 2), int(cy + h / 2)), (254, 254, 254), 1)
-
-
-                bbox_ratio = target_pos[0]/target_pos[1]
-                # print('bbox ratio:', bbox_ratio)
-
-                if correct_with_dynamics:
-                    c, pred_pos, pred_ratio = tracker_dyn.update(target_pos, target_sz, score)
-
-                    if c[0] or c[1]:
-                        # Remove winner bbox
-                        bboxes = bboxes[:, 1:]
-
-                        pred_pos, pred_sz, idx = get_best_bbox(bboxes, pred_pos, pred_ratio)
-                        tracker_dyn.update_bbox(pred_pos, pred_sz)
-
-                        state['target_pos'] = pred_pos
-                        state['target_sz'] = pred_sz
-
-
-                value['state'] = state
-
-                cx = state['target_pos'][0]
-                cy = state['target_pos'][1]
-                w = state['target_sz'][0]
-                h = state['target_sz'][1]
-                x_tl = cx - w/2
-                y_tl = cy - h/2
-
-                # Append predictions to pred DF
-                # x_topleft, y_topleft, w, h, cx, cy
-                pred_df = append_pred(pred_df, f, key, x_tl, y_tl, w, h, cx, cy)
-
-                if draw_pred:
-                    cv2.rectangle(im, (int(x_tl), int(y_tl)), (int(x_tl + w), int(y_tl + h)), col, 3)
-                    cv2.circle(im, (int(x_tl), int(y_tl)), 3, col, 3)
-
                 if draw_GT:
                     line = gt_df[(gt_df.FrameID == f) & (gt_df.ObjectID == key)]
                     gt_sz = np.asarray((line.Width.item(), line.Height.item()))
@@ -244,11 +199,159 @@ if __name__ == '__main__':
                     x_tl_gt = cx_gt - w_gt / 2
                     y_tl_gt = cy_gt - h_gt / 2
                     cv2.rectangle(im, (int(x_tl_gt), int(y_tl_gt)), (int(x_tl_gt + w_gt), int(y_tl_gt + h_gt)), col, 1)
-                    cv2.circle(im, (int(x_tl_gt), int(y_tl_gt)), 3, col, 1)
+                    # cv2.circle(im, (int(x_tl_gt), int(y_tl_gt)), 3, col, 1)
+
+                state, masks, rboxes_cand, bboxes = siamese_track_plus(state=value['state'], im=im_track, N=N,
+                                                                mask_enable=True,
+                                                                refine_enable=True, device=device)
+
+                target_sz = state['target_sz']
+                target_pos = state['target_pos']
+                score = state['score']
+                # cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, (255, 255, 0), 3)
 
 
-            cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
+                # Convert candidate to centroids and size shape
+                location_siam = np.int0(rboxes_cand[0][0].flatten()).reshape((-1, 1, 2))
+                poly_pos_siam, poly_sz_siam = get_aligned_bbox(rboxes_cand[0][0].flatten())
+                # cv2.circle(im, (int(poly_pos_siam[0]), int(poly_pos_siam[1])), 3, (255, 0, 0), 3)
+
+                if draw_proposal:
+                    cv2.polylines(im, [location_siam], True, col, 3)
+
+                # Remove winner bbox
+                # del rboxes_cand[0]
+                # bboxes = bboxes[:, 1:]
+
+
+                if filter_boxes:  # Filter overlapping boxes
+                    # print('rboxes cand shape:', len(rboxes_cand))
+                    rboxes = filter_bboxes_plus(rboxes_cand, iou_thr=0.5, score_thr=0.1)
+                    # print('rboxes shape:', len(rboxes))
+                else:
+                    rboxes = rboxes_cand
+                    # print('rboxes shape:', len(rboxes))
+                    # print('bboxes shape:', bboxes.shape)
+                    # print('score:', score)
+
+                poly_cand = np.zeros((4, len(rboxes)))
+                rboxes_flat = np.zeros((8, len(rboxes)))
+                for box in range(len(rboxes)):
+                    rboxes_flat[:, box] = rboxes[box][0].flatten()
+                    location = np.int0(rboxes[box][0].flatten()).reshape((-1, 1, 2))
+                    poly_pos, poly_sz = get_aligned_bbox(rboxes[box][0].flatten())
+                    poly_cand[0, box] = poly_pos[0]
+                    poly_cand[1, box] = poly_pos[1]
+                    poly_cand[2, box] = poly_sz[0]
+                    poly_cand[3, box] = poly_sz[1]
+
+
+                if count:
+                    poly_cand_shared = poly_cand
+                    bboxes_shared = bboxes
+                    rboxes_flat_shared = rboxes_flat
+                    count = False
+                else:
+                    poly_cand_shared = np.hstack((poly_cand_shared, poly_cand))
+                    bboxes_shared = np.hstack((bboxes_shared, bboxes))
+                    rboxes_flat_shared = np.hstack((rboxes_flat_shared, rboxes_flat))
+
+
+                if correct_with_dynamics:
+                    c, pred_pos, pred_ratio = tracker_dyn.update(poly_pos_siam, poly_sz_siam, score)
+                    # print('poly pos before correct:', poly_pos_siam)
+
+                    if c[0] or c[1]:
+                        value['predict'] = True
+                        value['pred_pos'] = pred_pos
+                        value['state'] = state
+
+                    else:
+                        value['predict'] = False
+                        value['state'] = state
+
+                        cx = poly_pos_siam[0]
+                        cy = poly_pos_siam[1]
+                        w = poly_sz_siam[0]
+                        h = poly_sz_siam[1]
+                        x_tl = cx - w / 2
+                        y_tl = cy - h / 2
+
+                        # Append predictions to pred DF
+                        pred_df = append_pred(pred_df, f, key, x_tl, y_tl, w, h, cx, cy)
+
+
+
+            if not count:
+                print('there are', rboxes_flat_shared.shape[1], 'candidates')
+                print('rboxes shape', rboxes_flat_shared.shape)
+
+                if draw_candidates:
+                    for box in range(rboxes_flat_shared.shape[1]):
+                        box_flat = rboxes_flat_shared[:, box]
+                        location = np.int0(box_flat).reshape((-1, 1, 2))
+                        cv2.polylines(im, [location], True, (255, 255, 255), 1)
+
+
+            # TODO: 2nd LOOP
+            print('\nSECOND LOOP:')
+            for key, value in objects.items():
+
+                if value['init_frame'] == f:
+                    continue
+
+                if not value['predict']:
+                    continue
+
+                print('Finding candidate for object', key, '------------------------')
+                col = colors[key-1]
+                tracker_dyn = value['tracker']
+                state = value['state']
+
+                pred_pos = value['pred_pos']
+                pred_ratio = 0  # Not used
+
+                # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 0, 255), 3)
+                pred_pos, pred_sz, idx = get_best_bbox(poly_cand_shared, pred_pos, pred_ratio)
+                print('idx:', idx)
+
+                poly_pos_siam, poly_sz_siam = pred_pos, pred_sz
+
+                # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 255, 0), 3)
+                tracker_dyn.update_bbox(pred_pos, pred_sz)
+
+                # Find correspondinb target_sz and target_pos
+                pred_pos = bboxes_shared[0:2, idx]
+                pred_sz = bboxes_shared[2:4, idx]
+                cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (255, 255, 255), 3)
+
+                state['target_pos'] = pred_pos
+                state['target_sz'] = pred_sz
+
+                location_siam = np.int0(rboxes_flat_shared[:, idx]).reshape((-1, 1, 2))
+                if draw_corrected:
+                    cv2.polylines(im, [location_siam], True, (255, 255, 0), 3)
+
+                # if draw_pred:
+                #     cv2.polylines(im, [location_siam], True, col, 3)
+
+                value['state'] = state
+
+                cx = poly_pos_siam[0]
+                cy = poly_pos_siam[1]
+                w = poly_sz_siam[0]
+                h = poly_sz_siam[1]
+                x_tl = cx - w/2
+                y_tl = cy - h/2
+
+                # Append predictions to pred DF
+                # x_topleft, y_topleft, w, h, cx, cy
+                pred_df = append_pred(pred_df, f, key, x_tl, y_tl, w, h, cx, cy)
+
+
+            # cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
             toc += cv2.getTickCount() - tic
+
 
     toc /= cv2.getTickFrequency()
     fps = f / toc
@@ -291,6 +394,5 @@ if __name__ == '__main__':
         tin = tracker_dyn.t_init
         tfin = num_frames
         c_gt = c_gt[tin-1:tfin+1, :]
-        print('tin', tin, 'tfin', tfin)
         plot_jbld_eta_score_4(tracker_dyn, c_gt, obj, tin, tfin)
         plot_gt_cand_pred_box(tracker_dyn, c_gt, obj, tin, tfin)

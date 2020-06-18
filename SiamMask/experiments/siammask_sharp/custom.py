@@ -172,7 +172,7 @@ class Custom(SiamMask):
 
     def template(self, template, reInit):
         # template.type() torch.cuda.FloatTensor
-        print('\n Update template\n')
+        # print('\n Update template\n')
         alpha = 0.9
         if reInit:
             self.zf = alpha * self.features(template) + (1-alpha)*self.zf

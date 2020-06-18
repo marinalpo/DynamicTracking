@@ -793,7 +793,7 @@ def plot_jbld_eta_score_3(tracker, c_gt, obj, norm, slow, tin, tfin):
     plt.show()
 
 
-def plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin):
+def plot_jbld_eta_score_4(tracker, c_gt, obj, tin, tfin):
     slow_name = ['Fast', 'Slow']
     norm_name = ['MSE', 'NORM']
 
@@ -810,6 +810,9 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin):
     Rs = tracker.Rs_clas
     Rs_pred = tracker.Rs_pred
 
+    slow=False
+    norm=True
+
     max_jbld = np.max(jbld)
     max_etas = np.max(etas)
 
@@ -822,7 +825,8 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin):
     R = 4
 
     fig, ax = plt.subplots(5, 2)
-    fig.tight_layout()
+    plt.tight_layout()
+    # fig.tight_layout()
 
     for i in range(4):
         for j in range(2):
@@ -924,10 +928,11 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, norm, slow, tin, tfin):
                         a = 0.4
                     ax[i, d].axvline(f+tin, color=(1, 0.8, 0), alpha=a, zorder=1)
 
-    plt.show()
+    plt.savefig('/data/results/plot1.png')
+    # plt.show()
 
 
-def plot_gt_cand_pred_box(tracker, c_gt, obj, norm, slow, tin, tfin):
+def plot_gt_cand_pred_box(tracker, c_gt, obj, tin, tfin):
     slow_name = ['Fast', 'Slow']
     norm_name = ['MSE', 'NORM']
 
@@ -955,7 +960,7 @@ def plot_gt_cand_pred_box(tracker, c_gt, obj, norm, slow, tin, tfin):
     R = 4
 
     fig, ax = plt.subplots(2, 1)
-    fig.tight_layout()
+    plt.tight_layout()
 
     ax[0].grid(axis='x', zorder=1, alpha=0.4)
     ax[1].grid(axis='x', zorder=1, alpha=0.4)
@@ -992,4 +997,5 @@ def plot_gt_cand_pred_box(tracker, c_gt, obj, norm, slow, tin, tfin):
             if flag[d]:
                 ax[d].axvline(f+tin, color=(1, 0.8, 0), alpha=0.7, zorder=1)
 
-    plt.show()
+    plt.savefig('/data/results/plot2.png')
+    # plt.show()

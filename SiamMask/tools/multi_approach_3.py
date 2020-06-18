@@ -23,6 +23,7 @@ parser.add_argument('--config', dest='config', default='config_davis.json',
 args = parser.parse_args()
 
 
+
 # Definitions
 font = cv2.FONT_HERSHEY_SIMPLEX
 font_size = 1
@@ -48,7 +49,7 @@ norm = True  # If true: Norm, if false: MSE
 
 T0 = 11  # System memory (best: 11)
 num_frames = 150  # 150 for Acrobats
-N = 75  # Maximum number of candidates returned by the tracking (15)
+N = 50  # Maximum number of candidates returned by the tracking (15)
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
 sequence = 'acrobats'  # SMOT: 'acrobats' or 'juggling'
 video = 'video0'
@@ -60,7 +61,7 @@ img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_p
 
 # TODO: Si el volem nomes dun objecte
 single_object = True
-obj = 4
+obj = 2
 
 # Loads init file, deletes targets if there are more than max_num_obj in the requested frames
 init, total_obj = create_init(init_path, num_frames, max_num_obj)
@@ -208,7 +209,7 @@ if __name__ == '__main__':
 
                 if filter_boxes:  # Filter overlapping boxes
                     print('rboxes cand shape:', len(rboxes_cand))
-                    rboxes = filter_bboxes_plus(rboxes_cand, iou_thr=0.6, score_thr=0.2)
+                    rboxes = filter_bboxes_plus(rboxes_cand, iou_thr=0.5, score_thr=0.1)
                     print('rboxes shape:', len(rboxes))
                 else:
                     rboxes = rboxes_cand
@@ -236,15 +237,18 @@ if __name__ == '__main__':
                     print('poly pos before correct:', poly_pos_siam)
 
                     if c[0] or c[1]:
-                        cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 0, 255), 3)
+                        # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 0, 255), 3)
                         pred_pos, pred_sz, idx = get_best_bbox(poly_cand, pred_pos, pred_ratio)
-                        cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 255, 0), 3)
+
+                        poly_pos_siam, poly_sz_siam = pred_pos, pred_sz
+
+                        # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 255, 0), 3)
                         tracker_dyn.update_bbox(pred_pos, pred_sz)
 
                         # Find correspondinb target_sz and target_pos
                         pred_pos = bboxes[0:2, idx]
                         pred_sz = bboxes[2:4, idx]
-                        cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (255, 255, 255), 3)
+                        # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (255, 255, 255), 3)
 
                         state['target_pos'] = pred_pos
                         state['target_sz'] = pred_sz
@@ -255,19 +259,16 @@ if __name__ == '__main__':
 
                 value['state'] = state
 
-                cx = state['target_pos'][0]
-                cy = state['target_pos'][1]
-                w = state['target_sz'][0]
-                h = state['target_sz'][1]
+                cx = poly_pos_siam[0]
+                cy = poly_pos_siam[1]
+                w = poly_sz_siam[0]
+                h = poly_sz_siam[1]
                 x_tl = cx - w/2
                 y_tl = cy - h/2
 
                 # Append predictions to pred DF
                 # x_topleft, y_topleft, w, h, cx, cy
                 pred_df = append_pred(pred_df, f, key, x_tl, y_tl, w, h, cx, cy)
-
-
-
 
                 if draw_GT:
                     line = gt_df[(gt_df.FrameID == f) & (gt_df.ObjectID == key)]
@@ -280,7 +281,7 @@ if __name__ == '__main__':
                     x_tl_gt = cx_gt - w_gt / 2
                     y_tl_gt = cy_gt - h_gt / 2
                     cv2.rectangle(im, (int(x_tl_gt), int(y_tl_gt)), (int(x_tl_gt + w_gt), int(y_tl_gt + h_gt)), col, 1)
-                    cv2.circle(im, (int(x_tl_gt), int(y_tl_gt)), 3, col, 1)
+                    # cv2.circle(im, (int(x_tl_gt), int(y_tl_gt)), 3, col, 1)
 
 
             cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
@@ -328,5 +329,8 @@ if __name__ == '__main__':
         tin = tracker_dyn.t_init
         tfin = num_frames
         c_gt = c_gt[tin-1:tfin+1, :]
-        plot_jbld_eta_score_4(tracker_dyn, c_gt, obj, norm, slow, tin, tfin)
-        plot_gt_cand_pred_box(tracker_dyn, c_gt, obj, norm, slow, tin, tfin)
+        plot_jbld_eta_score_4(tracker_dyn, c_gt, obj, tin, tfin)
+        plot_gt_cand_pred_box(tracker_dyn, c_gt, obj, tin, tfin)
+
+        print('16:45 (II), 17:01!!, 18:22, 18:56')
+        print('18:53, 19:05, 19:21, 19:30')

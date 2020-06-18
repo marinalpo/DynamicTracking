@@ -101,7 +101,7 @@ class TrackerDyn_2:
 
             if self.both:
                 if c[0] or c[1]:
-                    print('Lets predict BOTH!')
+                    # print(' --- Predict both coordinates')
                     pred_pos[0] = self.predict(0)
                     self.buffer_pos_corr[self.t - 1, 0] = pred_pos[0]
                     pred_pos[1] = self.predict(1)
@@ -113,12 +113,12 @@ class TrackerDyn_2:
                     self.buffer_pred[self.t - 1, 1] = pred_pos[1]
             else:
                 if c[0]:
-                    print('Lets predict x!')
+                    print('Predict coordinate x')
                     pred_pos[0] = self.predict(0)
                     self.buffer_pos_corr[self.t - 1, 0] = pred_pos[0]
                     self.buffer_pred[self.t - 1, 0] = pred_pos[0]
                 if c[1]:
-                    print('Lets predict y!')
+                    print('Predict coordinate y')
                     pred_pos[1] = self.predict(1)
                     self.buffer_pos_corr[self.t - 1, 1] = pred_pos[1]
                     self.buffer_pred[self.t - 1, 1] = pred_pos[1]
@@ -234,6 +234,7 @@ class TrackerDyn_2:
             # u_ts = u_ts.astype(int)
             # print('type uts 0', type(u_ts[0]))
 
+            # print('before prediction:', u_ts)
             ts = pd.DataFrame(u_ts)
             ts.columns = ['u']
 
@@ -248,6 +249,8 @@ class TrackerDyn_2:
             # Step 3: forecast results
             pred = results.forecast(1)
             # pred = results.forecast(1).to_numpy()
+
+            # print('Prediction:', pred)
 
 
         return pred
