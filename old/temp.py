@@ -1,7 +1,7 @@
 import torch
 import pickle as pkl
 import numpy as np
-from TrackerDynBoxes import TrackerDynBoxes
+
 from utils_visualization import *
 from utils_general import *
 import matplotlib.pyplot as plt

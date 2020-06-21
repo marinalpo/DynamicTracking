@@ -149,15 +149,15 @@ def get_aligned_bbox(loc):
     return pos, sz
 
 
-def filter_bboxes_plus(rboxes, iou_thr=0.5, score_thr=0.2):
+def filter_bboxes_plus(rboxes, iou_thr=0.5, score_thr=0.1):
     """
     rboxes: list, contains: [(np.array(polygon), score),(), ... , ()]
     """
-
     num_boxes = len(rboxes)
     best_box, best_box_score = rboxes[0][0], rboxes[0][1]
     filtered = []
-    filtered.append(rboxes[0])
+    idxs_filtered = np.zeros((num_boxes), dtype=np.bool)
+    # filtered.append(rboxes[0])
     best_box_poly = asPolygon(best_box.reshape(4, 2))  # 1 polygon, N vertices, 2 coords per vertex
     for n in range(1, num_boxes):
         next_box, next_box_score = rboxes[n]
@@ -169,9 +169,11 @@ def filter_bboxes_plus(rboxes, iou_thr=0.5, score_thr=0.2):
         if(iou < iou_thr):
             # they are separated enough
             filtered.append(rboxes[n])
+            idxs_filtered[n] = 1
         elif(next_box_score > best_box_score - score_thr):
             filtered.append(rboxes[n])
-    return filtered
+            idxs_filtered[n] = 1
+    return filtered, idxs_filtered
 
 def append_pred_single(f, ob, location, df):
   columns_location = ['FrameID', 'ObjectID', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4']
