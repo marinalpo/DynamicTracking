@@ -5,12 +5,14 @@ import pickle
 import argparse
 import pandas as pd
 import torch
+from itertools import compress
 from tools.test_multi import *
 from custom import Custom
 from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
 from dynamics.Tracker_Dynamics_2 import TrackerDyn_2
 from utils_dyn.utils_plots_dynamics import *
 import warnings
+from shapely.geometry import asPolygon
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 warnings.simplefilter('ignore', ConvergenceWarning)
 
@@ -32,14 +34,14 @@ dataset_name = ['MOT', 'SMOT', 'Stanford']
 columns_names = ['FrameID',	'ObjectID',	'x_topleft',	'y_topleft',	'Width',	'Height',	'isActive',	'isOccluded', 'cx', 'cy']
 max_num_obj = 10  # Maximum number of objects being tracked
 
-# Tracker Parameters
-correct_with_dynamics = True
+# Visualization Parameters
 draw_GT = True
 draw_proposal = True
 draw_candidates = True
 draw_pred = True
-
 draw_mask = False
+
+correct_with_dynamics = True
 filter_boxes = False
 eps = 1  # Noise variance
 metric = 0  # if 0: JBLD, if 1: JKL
@@ -48,8 +50,8 @@ slow = False  # If true: Slow(but Precise), if false: Fast
 norm = True  # If true: Norm, if false: MSE
 
 T0 = 11  # System memory (best: 11)
-num_frames = 50  # 150 for Acrobats
-N = 50  # Maximum number of candidates returned by the tracking (15)
+num_frames = 100  # 150 for Acrobats
+N = 100  # Maximum number of candidates returned by the tracking (15)
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
 sequence = 'acrobats'  # SMOT: 'acrobats' or 'juggling'
 video = 'video0'
@@ -60,8 +62,8 @@ img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_p
 
 
 # TODO: Si el volem nomes dun objecte
-single_object = True
-obj = 2
+single_object = False
+obj = 3
 
 # Loads init file, deletes targets if there are more than max_num_obj in the requested frames
 init, total_obj = create_init(init_path, num_frames, max_num_obj)
@@ -94,7 +96,7 @@ if __name__ == '__main__':
     cfg = load_config(args)
     device = 3
     torch.cuda.set_device(device)
-    # print('CUDA device:', torch.cuda.current_device())
+    print('CUDA device:', torch.cuda.current_device())
 
     # Initialize a SiamMask model for each object ID
     # print('Initializing', len(total_obj), 'tracker(s)...')
@@ -186,57 +188,66 @@ if __name__ == '__main__':
                                                                 mask_enable=True,
                                                                 refine_enable=True, device=device)
 
+
+
                 target_sz = state['target_sz']
                 target_pos = state['target_pos']
                 score = state['score']
-                cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, (255, 255, 0), 3)
+                # cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, (255, 255, 0), 3)
 
 
                 # Convert candidate to centroids and size shape
-
                 location = np.int0(rboxes_cand[0][0].flatten()).reshape((-1, 1, 2))
                 poly_pos_siam, poly_sz_siam = get_aligned_bbox(rboxes_cand[0][0].flatten())
-                # print('poly_pos:', poly_pos_siam)
-                cv2.circle(im, (int(poly_pos_siam[0]), int(poly_pos_siam[1])), 3, (255, 0, 0), 3)
+                cv2.circle(im, (int(poly_pos_siam[0]), int(poly_pos_siam[1])), 3, col, 3)
 
                 if draw_proposal:
                     cv2.polylines(im, [location], True, col, 3)
-
-                # Remove winner bbox
-                del rboxes_cand[0]
-                bboxes = bboxes[:, 1:]
-
-
-                if filter_boxes:  # Filter overlapping boxes
-                    print('rboxes cand shape:', len(rboxes_cand))
-                    rboxes, idxs = filter_bboxes_plus(rboxes_cand, iou_thr=0.5, score_thr=0.1)
-                    print('rboxes shape:', len(rboxes))
-                else:
-                    rboxes = rboxes_cand
-                    # print('bboxes cand:\n', bboxes)
-
-                poly_cand = np.zeros((4, len(rboxes)))
-                for box in range(len(rboxes)):
-                    location = np.int0(rboxes[box][0].flatten()).reshape((-1, 1, 2))
-                    poly_pos, poly_sz = get_aligned_bbox(rboxes[box][0].flatten())
-                    poly_cand[0, box] = poly_pos[0]
-                    poly_cand[1, box] = poly_pos[1]
-                    poly_cand[2, box] = poly_sz[0]
-                    poly_cand[3, box] = poly_sz[1]
-
-                    if draw_candidates:
-                        cv2.polylines(im, [location], True, (255, 255, 255), 1)
 
                 # bbox_ratio = target_pos[0]/target_pos[1]
                 # print('bbox ratio:', bbox_ratio)
 
                 if correct_with_dynamics:
                     c, pred_pos, pred_ratio = tracker_dyn.update(poly_pos_siam, poly_sz_siam, score)
-                    # print('poly pos before correct:', poly_pos_siam)
 
-                    if c[0] or c[1]:
-                        # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 0, 255), 3)
+
+                    if c[0] or c[1]:  # Prediction has been done
+                        print('------------------------------------')
+                        print('Trajectory not robust --> Prediction')
+                        print('Predicted position by Tracker Dynamics:', pred_pos)
+                        cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 0, 255), 3)
+
+                        if filter_boxes:  # Filter overlapping boxes
+                            rboxes, idxs_del = filter_bboxes_plus(rboxes_cand)
+                            bboxes = bboxes[0:4, np.ix_(idxs_del)].squeeze()
+                            masks = list(compress(masks, idxs_del))
+                            print('Filtered candidates:', N - bboxes.shape[1])
+
+                        else:
+                            # Remove winner bbox
+                            del rboxes_cand[0]
+                            del masks[0]
+                            bboxes = bboxes[:, 1:]
+                            # print('bboxes cand:\n', bboxes)
+
+                            rboxes = rboxes_cand
+
+                        poly_cand = np.zeros((4, len(rboxes)))
+                        for box in range(len(rboxes)):
+                            location = np.int0(rboxes[box][0].flatten()).reshape((-1, 1, 2))
+                            poly_pos, poly_sz = get_aligned_bbox(rboxes[box][0].flatten())
+                            poly_cand[0, box] = poly_pos[0]
+                            poly_cand[1, box] = poly_pos[1]
+                            poly_cand[2, box] = poly_sz[0]
+                            poly_cand[3, box] = poly_sz[1]
+
+                            if draw_candidates:
+                                cv2.polylines(im, [location], True, (255, 255, 255), 1)
+
+
                         pred_pos, pred_sz, idx = get_best_bbox(poly_cand, pred_pos, pred_ratio)
+                        cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 255, 0), 3)
+                        print('Position of closest bounding box:', pred_pos)
 
                         # print('idx:', idx)
                         # print('pred_pos:', pred_pos)
@@ -248,16 +259,24 @@ if __name__ == '__main__':
                         tracker_dyn.update_bbox(pred_pos, pred_sz)
 
                         # Find correspondinb target_sz and target_pos
-                        pred_pos = bboxes[0:2, idx]
-                        pred_sz = bboxes[2:4, idx]
-                        # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (255, 255, 255), 3)
+                        if bboxes.size == len(bboxes):
+                            pred_pos = bboxes[0:2]
+                            pred_sz = bboxes[2:4]
+
+                        else:
+                            pred_pos = bboxes[0:2, idx]
+                            pred_sz = bboxes[2:4, idx]
+                        mask = masks[idx]
+
+
+                        cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (255, 255, 255), 3)
 
                         state['target_pos'] = pred_pos
                         state['target_sz'] = pred_sz
 
                         location = np.int0(rboxes[idx][0].flatten()).reshape((-1, 1, 2))
                         if draw_pred:
-                            cv2.polylines(im, [location], True, (0, 255, 255), 3)
+                            cv2.polylines(im, [location], True, (255, 255, 0), 3)
 
                 value['state'] = state
 
@@ -271,6 +290,10 @@ if __name__ == '__main__':
                 # Append predictions to pred DF
                 # x_topleft, y_topleft, w, h, cx, cy
                 pred_df = append_pred(pred_df, f, key, x_tl, y_tl, w, h, cx, cy)
+
+                if draw_mask:
+                    mask = masks[0] > state['p'].seg_thr
+                    im[:, :, 2] = (mask > 0) * 255 + (mask == 0) * im[:, :, 2]
 
                 if draw_GT:
                     line = gt_df[(gt_df.FrameID == f) & (gt_df.ObjectID == key)]
@@ -288,8 +311,7 @@ if __name__ == '__main__':
 
             cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
 
-
-        toc += cv2.getTickCount() - tic
+            toc += cv2.getTickCount() - tic
 
     toc /= cv2.getTickFrequency()
     fps = f / toc
@@ -333,3 +355,4 @@ if __name__ == '__main__':
         c_gt = c_gt[tin-1:tfin+1, :]
         plot_jbld_eta_score_4(tracker_dyn, c_gt, obj, tin, tfin)
         plot_gt_cand_pred_box(tracker_dyn, c_gt, obj, tin, tfin)
+

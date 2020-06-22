@@ -148,6 +148,37 @@ def get_aligned_bbox(loc):
     sz = np.array([w, h])
     return pos, sz
 
+def filter_bboxes_plus_2(rboxes, last_bbox, size_th=0.3, iou_thr=0.5, score_thr=0.1):
+    num_boxes = len(rboxes)
+    filtered = []
+    idxs_filtered = np.zeros((num_boxes), dtype=np.bool)
+    last_poly = asPolygon(last_bbox.reshape(4, 2))
+    last_area = last_poly.area
+    # print('last_area:', last_area)
+    for n in range(1, num_boxes):
+        box, box_score = rboxes[n]
+        box_poly = asPolygon(box.reshape(4, 2))
+        area = box_poly.area
+        union_area = last_poly.union(box_poly)
+        union_area = union_area.area
+        intersection_area = last_poly.intersection(box_poly).area
+        iou = intersection_area/union_area
+        if area > size_th*last_area and iou > 0.01:  # ßbig enough and close enough
+            # print('b')
+            filtered.append(rboxes[n])
+            idxs_filtered[n] = 1
+        # TODO: Si amb l'anterior no es solapa, fora
+        # TODO: Si te un tamany molt menor que l'anterior, fora
+
+    if len(filtered) == 0:
+        print('retorno guanyador')
+        filtered.append(rboxes[0])
+        idxs_filtered[0] = 1
+
+    return filtered, idxs_filtered
+
+
+
 
 def filter_bboxes_plus(rboxes, iou_thr=0.5, score_thr=0.1):
     """

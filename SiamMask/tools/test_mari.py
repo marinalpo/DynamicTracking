@@ -38,7 +38,7 @@ draw_GT = True
 draw_proposal = True
 draw_candidates = True
 draw_pred = True
-draw_mask = True
+draw_mask = False
 
 correct_with_dynamics = True
 filter_boxes = False
@@ -49,7 +49,7 @@ slow = False  # If true: Slow(but Precise), if false: Fast
 norm = True  # If true: Norm, if false: MSE
 
 T0 = 11  # System memory (best: 11)
-num_frames = 100  # 150 for Acrobats
+num_frames = 150  # 150 for Acrobats
 N = 50  # Maximum number of candidates returned by the tracking (15)
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
 sequence = 'acrobats'  # SMOT: 'acrobats' or 'juggling'
@@ -61,7 +61,7 @@ img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_p
 
 
 # TODO: Si el volem nomes dun objecte
-single_object = True
+single_object = False
 obj = 3
 
 # Loads init file, deletes targets if there are more than max_num_obj in the requested frames
@@ -161,7 +161,7 @@ if __name__ == '__main__':
                 c, pred_pos, pred_ratio = tracker_dyn.update(target_pos, target_sz, 1)
 
                 nested_obj = {'target_pos': target_pos, 'target_sz': np.array([w, h]),
-                              'init_frame': f, 'siammask': tracker[ob], 'tracker': tracker_dyn}
+                              'init_frame': f, 'siammask': tracker[ob], 'tracker': tracker_dyn, 'last_poly': 0}
 
                 state, z = siamese_init(ob, im_init, nested_obj['target_pos'], nested_obj['target_sz'],
                                         nested_obj['siammask'], cfg['hp'], device=device)
@@ -179,6 +179,7 @@ if __name__ == '__main__':
                 print('Tracking object', key)
                 state = value['state']
                 tracker_dyn = value['tracker']
+                last_poly = value['last_poly']
 
                 # col = colors[np.where(total_obj == key)[0][0]]
                 col = colors[key-1]
@@ -192,19 +193,18 @@ if __name__ == '__main__':
                 target_sz = state['target_sz']
                 target_pos = state['target_pos']
                 score = state['score']
-                cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, (255, 255, 0), 3)
+
+                # cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, (255, 255, 0), 3)
 
 
                 # Convert candidate to centroids and size shape
-
                 location = np.int0(rboxes_cand[0][0].flatten()).reshape((-1, 1, 2))
+                this_poly = rboxes_cand[0][0]
                 poly_pos_siam, poly_sz_siam = get_aligned_bbox(rboxes_cand[0][0].flatten())
-                cv2.circle(im, (int(poly_pos_siam[0]), int(poly_pos_siam[1])), 3, (255, 0, 0), 3)
+                cv2.circle(im, (int(poly_pos_siam[0]), int(poly_pos_siam[1])), 3, col, 3)
 
                 if draw_proposal:
                     cv2.polylines(im, [location], True, col, 3)
-
-
 
                 # bbox_ratio = target_pos[0]/target_pos[1]
                 # print('bbox ratio:', bbox_ratio)
@@ -212,14 +212,18 @@ if __name__ == '__main__':
                 if correct_with_dynamics:
                     c, pred_pos, pred_ratio = tracker_dyn.update(poly_pos_siam, poly_sz_siam, score)
 
+
                     if c[0] or c[1]:  # Prediction has been done
+                        print('------------------------------------')
+                        print('Trajectory not robust --> Prediction')
+                        print('Predicted position by Tracker Dynamics:', pred_pos)
+                        cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 0, 255), 3)
 
                         if filter_boxes:  # Filter overlapping boxes
-
-                            rboxes, idxs_del = filter_bboxes_plus(rboxes_cand)
+                            rboxes, idxs_del = filter_bboxes_plus_2(rboxes_cand, last_poly)
                             bboxes = bboxes[0:4, np.ix_(idxs_del)].squeeze()
                             masks = list(compress(masks, idxs_del))
-                            print('Filtered candidates:', N - bboxes.shape[1])
+                            print('Filtered candidates:', N - sum(idxs_del))
 
                         else:
                             # Remove winner bbox
@@ -242,8 +246,10 @@ if __name__ == '__main__':
                             if draw_candidates:
                                 cv2.polylines(im, [location], True, (255, 255, 255), 1)
 
-                        # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 0, 255), 3)
+
                         pred_pos, pred_sz, idx = get_best_bbox(poly_cand, pred_pos, pred_ratio)
+                        cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 255, 0), 3)
+                        print('Position of closest bounding box:', pred_pos)
 
                         # print('idx:', idx)
                         # print('pred_pos:', pred_pos)
@@ -265,15 +271,16 @@ if __name__ == '__main__':
                         mask = masks[idx]
 
 
-                        # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (255, 255, 255), 3)
+                        cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (255, 255, 255), 3)
 
                         state['target_pos'] = pred_pos
                         state['target_sz'] = pred_sz
-
+                        this_poly = rboxes[idx][0]
                         location = np.int0(rboxes[idx][0].flatten()).reshape((-1, 1, 2))
                         if draw_pred:
                             cv2.polylines(im, [location], True, (255, 255, 0), 3)
 
+                value['last_poly'] = this_poly
                 value['state'] = state
 
                 cx = poly_pos_siam[0]
