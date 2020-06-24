@@ -103,8 +103,10 @@ class TrackerDyn_2:
                 if c[0] or c[1]:
                     # print(' --- Predict both coordinates')
                     pred_pos[0] = self.predict(0)
+                    # a = self.predict_hankel(0)
                     self.buffer_pos_corr[self.t - 1, 0] = pred_pos[0]
                     pred_pos[1] = self.predict(1)
+                    # a = self.predict_hankel(1)
                     self.buffer_pos_corr[self.t - 1, 1] = pred_pos[1]
                     pred_ratio = self.predict_ratio()
                     self.buffer_ratio[self.t-1] = pred_ratio
@@ -211,47 +213,76 @@ class TrackerDyn_2:
         return c
 
     def predict(self, coord):
+        # print('predict ssest')
         # xhat: (self.T0, 2)
         # flag: (self.t - 1, dim)
         # Return pred: (self.t, dim)
         # pred = np.zeros((1, 2))
-        for d in range(2):
-            d = coord
-            # TODO: POSSAR EL self.buffer_pos_corr
-            data_root = self.buffer_pos_corr[self.t - self.T0 - 1:self.t - 1, d]
-            u_ts = data_root
-            # print('u_ts shape:', u_ts.shape)
-            data_root = torch.from_numpy(data_root)
-            data_root = data_root.view(1, len(data_root))
-            [uhat_root, eta_root, x, R] = fast_incremental_hstln_mo(data_root, self.eta_max_pred, self.slow)
-            self.Rs_pred[self.t - 1, d] = R
+        d = coord
+        # TODO: POSSAR EL self.buffer_pos_corr
+        data_root = self.buffer_pos_corr[self.t - self.T0 - 1:self.t - 1, d]
+        u_ts = data_root
+        # print('u_ts shape:', u_ts.shape)
+        data_root = torch.from_numpy(data_root)
+        data_root = data_root.view(1, len(data_root))
+        [uhat_root, eta_root, x, R] = fast_incremental_hstln_mo(data_root, self.eta_max_pred, self.slow)
+        self.Rs_pred[self.t - 1, d] = R
 
-            # 1. Construct a model instance with our dataset
+        # 1. Construct a model instance with our dataset
 
-            # uhat = uhat_root.numpy()
-            # uhat = uhat.squeeze()
-            # u_ts = uhat
-            # u_ts = u_ts.astype(int)
-            # print('type uts 0', type(u_ts[0]))
+        # uhat = uhat_root.numpy()
+        # uhat = uhat.squeeze()
+        # u_ts = uhat
+        # u_ts = u_ts.astype(int)
+        # print('type uts 0', type(u_ts[0]))
 
-            # print('before prediction:', u_ts)
-            ts = pd.DataFrame(u_ts)
-            ts.columns = ['u']
+        # print('before prediction:', u_ts)
+        ts = pd.DataFrame(u_ts)
+        ts.columns = ['u']
 
 
-            # Step 1: construct an SARIMAX model for US inflation data
-            # https://www.statsmodels.org/dev/generated/statsmodels.tsa.statespace.sarimax.SARIMAX.html#statsmodels.tsa.statespace.sarimax.SARIMAX
-            model = sm.tsa.SARIMAX(ts.u, order=(R, 0, 0), trend='ct', measurement_error=True)
+        # Step 1: construct an SARIMAX model for US inflation data
+        # https://www.statsmodels.org/dev/generated/statsmodels.tsa.statespace.sarimax.SARIMAX.html#statsmodels.tsa.statespace.sarimax.SARIMAX
+        model = sm.tsa.SARIMAX(ts.u, order=(R, 0, 0), trend='ct', measurement_error=True)
 
-            # Step 2: fit the model's parameters by maximum likelihood
-            results = model.fit(disp=0, maxiter=200, method='nm')
+        # Step 2: fit the model's parameters by maximum likelihood
+        results = model.fit(disp=0, maxiter=200, method='nm')
 
-            # Step 3: forecast results
-            pred = results.forecast(1)
-            # pred = results.forecast(1).to_numpy()
+        # Step 3: forecast results
+        pred = results.forecast(1)
+        # pred = results.forecast(1).to_numpy()
 
-            # print('Prediction:', pred)
+        # print('Prediction:', pred)
+        # print('prediction ssest:', pred)
 
+
+        return pred
+
+
+    def predict_hankel(self, coord):
+        print('predict amb mario')
+        # xhat: (self.T0, 2)
+        # flag: (self.t - 1, dim)
+        # Return pred: (self.t, dim)
+        # pred = np.zeros((1, 2))
+
+        d = coord
+        # TODO: POSSAR EL self.buffer_pos_corr
+        data_root = self.buffer_pos_corr[self.t - self.T0 - 1:self.t - 1, d]
+        m = np.mean(data_root)
+
+        # print('u_ts shape:', u_ts.shape)
+        data_root = torch.from_numpy(data_root)
+        data_root = data_root.view(1, len(data_root))
+        [uhat_root, eta_root, x, R] = fast_incremental_hstln_mo(data_root, self.eta_max_pred, self.slow)
+        self.Rs_pred[self.t - 1, d] = R
+        u_ts = uhat_root.t()
+        nr = R + 1
+        nc = self.T0 - R
+        # print('u_ts.shape', u_ts.shape)
+        H = Hankel_new(u_ts, nr, nc, mean=False)
+        pred = predict_Hankel(H)
+        # print('prediction mario:', pred)
 
         return pred
 

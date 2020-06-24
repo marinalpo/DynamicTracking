@@ -12,7 +12,6 @@ from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
 from dynamics.Tracker_Dynamics_2 import TrackerDyn_2
 from utils_dyn.utils_plots_dynamics import *
 import warnings
-from shapely.geometry import asPolygon
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 warnings.simplefilter('ignore', ConvergenceWarning)
 
@@ -35,26 +34,27 @@ columns_names = ['FrameID',	'ObjectID',	'x_topleft',	'y_topleft',	'Width',	'Heig
 max_num_obj = 10  # Maximum number of objects being tracked
 
 # Visualization Parameters
-draw_GT = True
-draw_proposal = True
-draw_candidates = True
-draw_pred = True
+draw_GT = False
+draw_proposal = False
+draw_candidates = False
+draw_pred = False
 draw_mask = False
 
 correct_with_dynamics = True
-filter_boxes = False
+filter_boxes = True
 eps = 1  # Noise variance
 metric = 0  # if 0: JBLD, if 1: JKL
 W = 3  # Smoothing window length
 slow = False  # If true: Slow(but Precise), if false: Fast
 norm = True  # If true: Norm, if false: MSE
 
+
 T0 = 11  # System memory (best: 11)
-num_frames = 100  # 150 for Acrobats
+num_frames = 150  # 1285 crowd # 150 acrobats / 130 juggling/ 600 slalom / 581 seagulls/
 N = 100  # Maximum number of candidates returned by the tracking (15)
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
-sequence = 'acrobats'  # SMOT: 'acrobats' or 'juggling'
-video = 'video0'
+sequence = 'crowd'  # SMOT: 'acrobats' or 'juggling'
+video = 'video1'
 
 print('\nDataset:', dataset_name[dataset], ' Sequence:', sequence, ' Number of frames:', num_frames)
 
@@ -63,7 +63,7 @@ img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_p
 
 # TODO: Si el volem nomes dun objecte
 single_object = False
-obj = 3
+obj = 5
 
 # Loads init file, deletes targets if there are more than max_num_obj in the requested frames
 init, total_obj = create_init(init_path, num_frames, max_num_obj)
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     print('CUDA device:', torch.cuda.current_device())
 
     # Initialize a SiamMask model for each object ID
-    # print('Initializing', len(total_obj), 'tracker(s)...')
+    print('Initializing', len(total_obj), 'tracker(s)...')
     tracker = {}
     dynamics = {}
     for obj in total_obj:
@@ -111,7 +111,7 @@ if __name__ == '__main__':
         siammask.eval().to(device)
         tracker[obj] = siammask
 
-        # print('Tracker:', obj, ' Initialized')
+        print('Tracker:', obj, ' Initialized')
 
     # Parse Image files
     img_files = sorted(glob.glob(join(img_path, '*.jp*')))[000000:num_frames]
@@ -124,12 +124,14 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         for f, im in enumerate(ims):
+            if f % 10 == 0:
+                print('Frame ', f, ' of', num_frames)
             f = f + 1  # Begins with image 000001.jpg
-            print('------------------------ Frame:', f, '----------------------------')
+            # print('------------------------ Frame:', f, '----------------------------')
             im_init = im.copy()
             im_track = im.copy()
             tic = cv2.getTickCount()
-            cv2.putText(im, 'Approach 3', (10, 30), font, font_size * 0.75, (255, 255, 255), 2, cv2.LINE_AA)
+            # cv2.putText(im, 'Approach 3', (10, 30), font, font_size * 0.75, (255, 255, 255), 2, cv2.LINE_AA)
 
             # Get number of objects that are initialized in this frame
             init_frame = init[init.FrameID == f]
@@ -162,44 +164,57 @@ if __name__ == '__main__':
                 c, pred_pos, pred_ratio = tracker_dyn.update(target_pos, target_sz, 1)
 
                 nested_obj = {'target_pos': target_pos, 'target_sz': np.array([w, h]),
-                              'init_frame': f, 'siammask': tracker[ob], 'tracker': tracker_dyn}
+                              'init_frame': f, 'siammask': tracker[ob], 'tracker': tracker_dyn, 'last_poly': 0}
 
                 state, z = siamese_init(ob, im_init, nested_obj['target_pos'], nested_obj['target_sz'],
                                         nested_obj['siammask'], cfg['hp'], device=device)
 
                 nested_obj['state'] = state
                 objects[ob] = nested_obj
-                cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (255, 255, 0), 5)
-                cv2.putText(im, 'init obj:'+str(ob), (int(x), int(y) - 7), font, font_size * 0.75, (255, 255, 0), 2, cv2.LINE_AA)
+                # cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (255, 255, 0), 5)
+                # cv2.putText(im, 'init obj:'+str(ob), (int(x), int(y) - 7), font, font_size * 0.75, (255, 255, 0), 2, cv2.LINE_AA)
 
             for key, value in objects.items():
                 if value['init_frame'] == f:
-                    print('Not going to track object', key, 'at this frame')
+                    # print('Not going to track object', key, 'at this frame')
                     continue
 
-                print('Tracking object', key)
+                # print('Tracking object', key)
                 state = value['state']
                 tracker_dyn = value['tracker']
+                last_poly = value['last_poly']
 
                 # col = colors[np.where(total_obj == key)[0][0]]
-                col = colors[key-1]
+                # col = colors[key-1]
 
-                state, masks, rboxes_cand, bboxes = siamese_track_plus(state=value['state'], im=im_track, N=N,
-                                                                mask_enable=True,
-                                                                refine_enable=True, device=device)
+                if correct_with_dynamics:
+                    state, masks, rboxes_cand, bboxes = siamese_track_plus(state=value['state'], im=im_track, N=N,
+                                                                    mask_enable=True,
+                                                                    refine_enable=True, device=device)
+                else:
+                    state = siamese_track(state=value['state'], im=im_track,
+                                                                    mask_enable=True,
+                                                                    refine_enable=True, device=device)
 
 
 
                 target_sz = state['target_sz']
                 target_pos = state['target_pos']
                 score = state['score']
+
                 # cv2.circle(im, (int(target_pos[0]), int(target_pos[1])), 3, (255, 255, 0), 3)
 
 
                 # Convert candidate to centroids and size shape
-                location = np.int0(rboxes_cand[0][0].flatten()).reshape((-1, 1, 2))
-                poly_pos_siam, poly_sz_siam = get_aligned_bbox(rboxes_cand[0][0].flatten())
-                cv2.circle(im, (int(poly_pos_siam[0]), int(poly_pos_siam[1])), 3, col, 3)
+                if not correct_with_dynamics:
+                    # location = np.int0(state['ploygon'].flatten()).reshape((-1, 1, 2))
+                    this_poly = 0
+                    poly_pos_siam, poly_sz_siam = get_aligned_bbox(state['ploygon'].flatten())
+                else:
+                    location = np.int0(rboxes_cand[0][0].flatten()).reshape((-1, 1, 2))
+                    this_poly = rboxes_cand[0][0]
+                    poly_pos_siam, poly_sz_siam = get_aligned_bbox(rboxes_cand[0][0].flatten())
+                # cv2.circle(im, (int(poly_pos_siam[0]), int(poly_pos_siam[1])), 3, col, 3)
 
                 if draw_proposal:
                     cv2.polylines(im, [location], True, col, 3)
@@ -212,16 +227,14 @@ if __name__ == '__main__':
 
 
                     if c[0] or c[1]:  # Prediction has been done
-                        print('------------------------------------')
-                        print('Trajectory not robust --> Prediction')
-                        print('Predicted position by Tracker Dynamics:', pred_pos)
-                        cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 0, 255), 3)
+                        # print('Trajectory not robust --> Prediction')
+                        # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 0, 255), 3)
 
                         if filter_boxes:  # Filter overlapping boxes
-                            rboxes, idxs_del = filter_bboxes_plus(rboxes_cand)
+                            rboxes, idxs_del = filter_bboxes_plus_2(rboxes_cand, last_poly, size_th=0.2, iou_thr=0)
                             bboxes = bboxes[0:4, np.ix_(idxs_del)].squeeze()
                             masks = list(compress(masks, idxs_del))
-                            print('Filtered candidates:', N - bboxes.shape[1])
+                            # print('Filtered candidates:', N - sum(idxs_del))
 
                         else:
                             # Remove winner bbox
@@ -246,8 +259,8 @@ if __name__ == '__main__':
 
 
                         pred_pos, pred_sz, idx = get_best_bbox(poly_cand, pred_pos, pred_ratio)
-                        cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 255, 0), 3)
-                        print('Position of closest bounding box:', pred_pos)
+                        # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 255, 0), 3)
+                        # print('Position of closest bounding box:', pred_pos)
 
                         # print('idx:', idx)
                         # print('pred_pos:', pred_pos)
@@ -269,15 +282,16 @@ if __name__ == '__main__':
                         mask = masks[idx]
 
 
-                        cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (255, 255, 255), 3)
+                        # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (255, 255, 255), 3)
 
                         state['target_pos'] = pred_pos
                         state['target_sz'] = pred_sz
-
+                        this_poly = rboxes[idx][0]
                         location = np.int0(rboxes[idx][0].flatten()).reshape((-1, 1, 2))
                         if draw_pred:
                             cv2.polylines(im, [location], True, (255, 255, 0), 3)
 
+                value['last_poly'] = this_poly
                 value['state'] = state
 
                 cx = poly_pos_siam[0]
@@ -309,7 +323,7 @@ if __name__ == '__main__':
                     # cv2.circle(im, (int(x_tl_gt), int(y_tl_gt)), 3, col, 1)
 
 
-            cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
+            # cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
 
             toc += cv2.getTickCount() - tic
 
@@ -336,12 +350,13 @@ if __name__ == '__main__':
     print('SiamMask Time: {:02.1f}s Speed: {:3.1f}fps)'.format(toc, fps))
 
     # TODO: Metrics computation
-    mED, mIOU, mP, mota, motp = compute_metrics(gt_df, pred_df, th=0.8)
+    # mED, mIOU, mP, mota, motp = compute_metrics(gt_df, pred_df, th=0.8)
+    mP, mota, motp = compute_metrics_2(gt_df, pred_df, th=0.8)
 
     print('\n------------------- MEASURES REPORT: -------------------')
     print('Speed:', np.around(fps, 2), 'fps')
-    print('mED:', mED, 'pixels')
-    print('mIOU:', mIOU, '%')
+    # print('mED:', mED, 'pixels')
+    # print('mIOU:', mIOU, '%')
     print('mP(@0.8):', mP, '%')
     if not single_object:
         print('MOTA(@0.8):', mota, '%')

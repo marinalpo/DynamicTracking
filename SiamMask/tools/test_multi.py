@@ -108,6 +108,61 @@ def compute_metrics(gt_df, pred_df, th=0.8):
     return mED, mIOU, mP[0], mota[0], motp[0]
 
 
+def compute_metrics_2(gt_df, pred_df, th=0.8):
+    # Sort dataframes
+    gt_df = gt_df.sort_values(['FrameID', 'ObjectID'])
+    pred_df = pred_df.sort_values(['FrameID', 'ObjectID'])
+
+    num_frames = pred_df.FrameID.max()
+    acc = mm.MOTAccumulator(auto_id=True)
+    acc2 = mm.MOTAccumulator(auto_id=True)
+
+    for f in range(1, num_frames + 1):
+        # Get obj ids
+        this_frame_gt_ids = np.asarray(gt_df[(gt_df.FrameID == f) & (gt_df.isActive == 1)]['ObjectID'])
+        this_frame_gt = gt_df[(gt_df.FrameID == f) & (gt_df.isActive == 1)]
+
+        activs = this_frame_gt.ObjectID.unique()
+        this_frame_hyp = pred_df[(pred_df.FrameID == f) & (pred_df.ObjectID.isin(activs))]
+        this_frame_hyp_ids = np.asarray(pred_df[(pred_df.FrameID == f) & (pred_df.ObjectID.isin(activs))]['ObjectID'])
+
+        # GT2 = np.asarray(this_frame_gt.loc[:, ['cx', 'cy']])
+        # HYP2 = np.asarray(this_frame_hyp.loc[:, ['cx', 'cy']])
+        # if f == 1:
+        #     EDs = np.sqrt((GT2[:, 0] - HYP2[:, 0]) ** 2 + (GT2[:, 1] - HYP2[:, 1]) ** 2)
+        # else:
+        #     D = np.sqrt((GT2[:, 0] - HYP2[:, 0]) ** 2 + (GT2[:, 1] - HYP2[:, 1]) ** 2)
+        #     EDs = np.hstack((EDs, D))
+        #
+        GT = np.asarray(this_frame_gt.loc[:, ['x_topleft', 'y_topleft', 'Width', 'Height']])
+        HYP = np.asarray(this_frame_hyp.loc[:, ['x_topleft', 'y_topleft', 'Width', 'Height']])
+        # if f == 1:
+        #     c = mm.distances.iou_matrix(GT, HYP, max_iou=1)
+        #     IOUs = 1 - np.diagonal(c)
+        # else:
+        #     c = mm.distances.iou_matrix(GT, HYP, max_iou=1)
+        #     IOUs = np.hstack((IOUs, 1 - np.diagonal(c)))
+
+        acc.update(
+            this_frame_gt_ids,  # Ground truth objects in this frame
+            this_frame_hyp_ids,  # Detector hypotheses in this frame
+            mm.distances.iou_matrix(GT, HYP, max_iou=th)  # 0.1 Molt restrictiu
+        )
+
+    mh = mm.metrics.create()
+    summary = mh.compute(acc,
+                         metrics=['mota', 'motp', 'num_matches', 'num_misses', 'num_false_positives', 'num_switches',
+                                  'precision', 'num_predictions', 'num_objects'], name='acc')
+
+    mota = np.around(summary['mota'] * 100, 2)
+    motp = np.around((1 - summary['motp']) * 100, 2)
+    mP = np.around(summary['precision'] * 100, 2)
+    # mED = np.around(np.mean(EDs), 2)
+    # mIOU = np.around(np.mean(IOUs) * 100, 2)
+
+    return mP[0], mota[0], motp[0]
+
+
 def get_best_bbox(bboxes, pred_pos, pred_ratio):
     # bboxes shape: (4, num_cand)
 
@@ -148,7 +203,7 @@ def get_aligned_bbox(loc):
     sz = np.array([w, h])
     return pos, sz
 
-def filter_bboxes_plus_2(rboxes, last_bbox, size_th=0.3, iou_thr=0.5, score_thr=0.1):
+def filter_bboxes_plus_2(rboxes, last_bbox, size_th=0.2, iou_thr=0):
     num_boxes = len(rboxes)
     filtered = []
     idxs_filtered = np.zeros((num_boxes), dtype=np.bool)
@@ -163,7 +218,7 @@ def filter_bboxes_plus_2(rboxes, last_bbox, size_th=0.3, iou_thr=0.5, score_thr=
         union_area = union_area.area
         intersection_area = last_poly.intersection(box_poly).area
         iou = intersection_area/union_area
-        if area > size_th*last_area and iou > 0.01:  # ßbig enough and close enough
+        if area > size_th*last_area and iou > iou_thr:  # ßbig enough and close enough
             # print('b')
             filtered.append(rboxes[n])
             idxs_filtered[n] = 1
@@ -884,15 +939,15 @@ def siamese_track(state, im, mask_enable=True, refine_enable=True, device='cpu',
             prbox = cv2.boxPoints(cv2.minAreaRect(polygon))  # Rotated Rectangle
             rbox_in_img = prbox
         else:  # empty mask
-            print('target pos:', target_pos)
-            print('target sz:', target_sz)
+            # print('target pos:', target_pos)
+            # print('target sz:', target_sz)
             location = cxy_wh_2_rect(target_pos, target_sz)
-            print('location:', location)
+            # print('location:', location)
             rbox_in_img = np.array([[location[0], location[1]],
                                     [location[0] + location[2], location[1]],
                                     [location[0] + location[2], location[1] + location[3]],
                                     [location[0], location[1] + location[3]]])
-            print('rbox_in_img:', rbox_in_img)
+            # print('rbox_in_img:', rbox_in_img)
 
     target_pos[0] = max(0, min(state['im_w'], target_pos[0]))
     target_pos[1] = max(0, min(state['im_h'], target_pos[1]))

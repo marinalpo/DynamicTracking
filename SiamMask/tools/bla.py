@@ -32,7 +32,7 @@ font_size = 1
 columns_location = ['FrameID', 'ObjectID', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4']
 dataset_name = ['MOT', 'SMOT', 'Stanford']
 columns_names = ['FrameID',	'ObjectID',	'x_topleft',	'y_topleft',	'Width',	'Height',	'isActive',	'isOccluded', 'cx', 'cy']
-
+max_num_obj = 10  # Maximum number of objects being tracked
 
 # Visualization Parameters
 draw_GT = False
@@ -41,7 +41,7 @@ draw_candidates = False
 draw_pred = True
 draw_mask = False
 
-correct_with_dynamics = False
+correct_with_dynamics = True
 filter_boxes = True
 eps = 1  # Noise variance
 metric = 0  # if 0: JBLD, if 1: JKL
@@ -49,12 +49,11 @@ W = 3  # Smoothing window length
 slow = False  # If true: Slow(but Precise), if false: Fast
 norm = True  # If true: Norm, if false: MSE
 
-max_num_obj = 10  # Maximum number of objects being tracked
 T0 = 11  # System memory (best: 11)
-num_frames = 300  # 150 for Acrobats / 130 for juggling
-N = 1  # Maximum number of candidates returned by the tracking (15)
+num_frames = 150  # 150 for Acrobats / 130 for juggling
+N = 50  # Maximum number of candidates returned by the tracking (15)
 dataset = 1  # 0: MOT, S1: SMOT, 2: Stanford
-sequence = 'balls'  # SMOT: 'acrobats' or 'juggling'
+sequence = 'acrobats'  # SMOT: 'acrobats' or 'juggling'
 video = 'video0'
 
 print('\nDataset:', dataset_name[dataset], ' Sequence:', sequence, ' Number of frames:', num_frames)
