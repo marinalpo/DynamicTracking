@@ -51,19 +51,25 @@ norm = True  # If true: Norm, if false: MSE
 
 T0 = 11  # System memory (best: 11)
 num_frames = 150  # 1285 crowd # 150 acrobats / 130 juggling/ 600 slalom / 581 seagulls/
-N = 100  # Maximum number of candidates returned by the tracking (15)
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
-sequence = 'crowd'  # SMOT: 'acrobats' or 'juggling'
+sequence = 'acrobats'  # SMOT: 'acrobats' or 'juggling'
 video = 'video1'
-
 print('\nDataset:', dataset_name[dataset], ' Sequence:', sequence, ' Number of frames:', num_frames)
 
 img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_path = get_paths(dataset, sequence, video)
 
 
 # TODO: Si el volem nomes dun objecte
-single_object = False
-obj = 5
+single_object = True
+obj = 3
+config = 'C'
+if config == 'A':
+    N, size_th, iou_thr = 50, 0.2, 0.0
+elif config == 'B':
+    N, size_th, iou_thr = 100, 0.7, 0.5
+elif config == 'C':
+    N, size_th, iou_thr = 100, 0.5, 0.2
+
 
 # Loads init file, deletes targets if there are more than max_num_obj in the requested frames
 init, total_obj = create_init(init_path, num_frames, max_num_obj)
@@ -230,8 +236,10 @@ if __name__ == '__main__':
                         # print('Trajectory not robust --> Prediction')
                         # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 0, 255), 3)
 
+
+
                         if filter_boxes:  # Filter overlapping boxes
-                            rboxes, idxs_del = filter_bboxes_plus_2(rboxes_cand, last_poly, size_th=0.2, iou_thr=0)
+                            rboxes, idxs_del = filter_bboxes_plus_2(rboxes_cand, last_poly, size_th=size_th, iou_thr=iou_thr)
                             bboxes = bboxes[0:4, np.ix_(idxs_del)].squeeze()
                             masks = list(compress(masks, idxs_del))
                             # print('Filtered candidates:', N - sum(idxs_del))
@@ -350,15 +358,25 @@ if __name__ == '__main__':
     print('SiamMask Time: {:02.1f}s Speed: {:3.1f}fps)'.format(toc, fps))
 
     # TODO: Metrics computation
-    # mED, mIOU, mP, mota, motp = compute_metrics(gt_df, pred_df, th=0.8)
-    mP, mota, motp = compute_metrics_2(gt_df, pred_df, th=0.8)
+    if single_object:
+        mED, mIOU, mP, mota, motp = compute_metrics(gt_df, pred_df, th=0.8)
+    else:
+        mP, mota, motp = compute_metrics_2(gt_df, pred_df, th=0.8)
 
+
+    print('Sequence:', sequence)
+    if single_object:
+        print('Object:', obj)
+        print('Configuration:', config)
     print('\n------------------- MEASURES REPORT: -------------------')
+
     print('Speed:', np.around(fps, 2), 'fps')
-    # print('mED:', mED, 'pixels')
-    # print('mIOU:', mIOU, '%')
-    print('mP(@0.8):', mP, '%')
-    if not single_object:
+    if single_object:
+        print('mED:', mED, 'pixels')
+        print('mIOU:', mIOU, '%')
+        print('mP(@0.8):', mP, '%')
+    else:
+        print('mP(@0.8):', mP, '%')
         print('MOTA(@0.8):', mota, '%')
         print('MOTP(@0.8):', motp, '%')
     print('--------------------------------------------------------\n')

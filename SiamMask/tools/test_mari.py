@@ -35,13 +35,13 @@ columns_names = ['FrameID',	'ObjectID',	'x_topleft',	'y_topleft',	'Width',	'Heig
 
 
 # Visualization Parameters
-draw_GT = False
+draw_GT = True
 draw_proposal = True
-draw_candidates = False
+draw_candidates = True
 draw_pred = True
 draw_mask = False
 
-correct_with_dynamics = False
+correct_with_dynamics = True
 filter_boxes = True
 eps = 1  # Noise variance
 metric = 0  # if 0: JBLD, if 1: JKL
@@ -51,10 +51,10 @@ norm = True  # If true: Norm, if false: MSE
 
 max_num_obj = 10  # Maximum number of objects being tracked
 T0 = 11  # System memory (best: 11)
-num_frames = 300  # 150 for Acrobats / 130 for juggling
-N = 1  # Maximum number of candidates returned by the tracking (15)
+num_frames = 150  # 150 for Acrobats / 130 for juggling
+N = 100  # Maximum number of candidates returned by the tracking (15)
 dataset = 1  # 0: MOT, S1: SMOT, 2: Stanford
-sequence = 'balls'  # SMOT: 'acrobats' or 'juggling'
+sequence = 'acrobats'  # SMOT: 'acrobats' or 'juggling'
 video = 'video0'
 
 print('\nDataset:', dataset_name[dataset], ' Sequence:', sequence, ' Number of frames:', num_frames)
@@ -64,7 +64,15 @@ img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_p
 
 # TODO: Si el volem nomes dun objecte
 single_object = False
-obj = 1
+obj = 3
+config = 'B'
+if config == 'A':  # 2: 96.67%
+    N, size_th, iou_thr = 50, 0.2, 0
+elif config == 'B':  # 4: 98.62%, 5: 99.33%
+    N, size_th, iou_thr = 75, 0.1, 0.01
+elif config == 'C':  # 3: 86.92%
+    N, size_th, iou_thr = 100, 0.5, 0.2
+
 
 # Loads init file, deletes targets if there are more than max_num_obj in the requested frames
 init, total_obj = create_init(init_path, num_frames, max_num_obj)
@@ -218,16 +226,23 @@ if __name__ == '__main__':
 
 
                     if c[0] or c[1]:  # Prediction has been done
+
+                        # draw all candidates before filtering
+                        rboxes_all = rboxes_cand
+                        for box in range(len(rboxes_all)):
+                            location_all = np.int0(rboxes_all[box][0].flatten()).reshape((-1, 1, 2))
+                            cv2.polylines(im, [location_all], True, (0, 0, 255), 1)
+
                         print('------------------------------------')
                         print('Trajectory not robust --> Prediction')
                         # print('Predicted position by Tracker Dynamics:', pred_pos)
                         # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 0, 255), 3)
 
                         if filter_boxes:  # Filter overlapping boxes
-                            rboxes, idxs_del = filter_bboxes_plus_2(rboxes_cand, last_poly)
+                            rboxes, idxs_del = filter_bboxes_plus_2(rboxes_cand, last_poly,  size_th=size_th, iou_thr=iou_thr)
                             bboxes = bboxes[0:4, np.ix_(idxs_del)].squeeze()
                             masks = list(compress(masks, idxs_del))
-                            # print('Filtered candidates:', N - sum(idxs_del))
+                            print('Filtered candidates:', N - sum(idxs_del))
 
                         else:
                             # Remove winner bbox
@@ -340,19 +355,26 @@ if __name__ == '__main__':
 
 
 
-    print('SiamMask Time: {:02.1f}s Speed: {:3.1f}fps)'.format(toc, fps))
 
     # TODO: Metrics computation
-    # TODO: Metrics computation
-    # mED, mIOU, mP, mota, motp = compute_metrics(gt_df, pred_df, th=0.8)
-    mP, mota, motp = compute_metrics_2(gt_df, pred_df, th=0.8)
+    if single_object:
+        mED, mIOU, mP, mota, motp = compute_metrics(gt_df, pred_df, th=0.8)
+    else:
+        mP, mota, motp = compute_metrics_2(gt_df, pred_df, th=0.8)
 
-    print('\n------------------- MEASURES REPORT: -------------------')
+    print('\n\nSequence:', sequence)
+    if single_object:
+        print('Object:', obj)
+        print('Configuration:', config)
+    print('------------------- MEASURES REPORT: -------------------')
+
     print('Speed:', np.around(fps, 2), 'fps')
-    # print('mED:', mED, 'pixels')
-    # print('mIOU:', mIOU, '%')
-    print('mP(@0.8):', mP, '%')
-    if not single_object:
+    if single_object:
+        print('mED:', mED, 'pixels')
+        print('mIOU:', mIOU, '%')
+        print('mP(@0.8):', mP, '%')
+    else:
+        print('mP(@0.8):', mP, '%')
         print('MOTA(@0.8):', mota, '%')
         print('MOTP(@0.8):', motp, '%')
     print('--------------------------------------------------------\n')
@@ -361,7 +383,9 @@ if __name__ == '__main__':
     if single_object and correct_with_dynamics:
         tin = tracker_dyn.t_init
         tfin = num_frames
-        c_gt = c_gt[tin-1:tfin+1, :]
+        c_gt = c_gt[tin - 1:tfin + 1, :]
         plot_jbld_eta_score_4(tracker_dyn, c_gt, obj, tin, tfin)
         plot_gt_cand_pred_box(tracker_dyn, c_gt, obj, tin, tfin)
+
+
 
