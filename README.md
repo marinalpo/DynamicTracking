@@ -7,7 +7,7 @@ The task of Video Object Tracking has for a long time received attention within 
 
 To achieve this goal, we propose a unified framework that combines, in an online manner, an <i>off-the-shelf</i> single-object siamese tracker (SiamMask), which is modified to perform multi-object tracking and to provide more than one detection candidate, with a Dynamics Module (DM). This module detects when the proposed target position is not dynamically consistent and, if that is the case, predicts an alternative which is used to choose the best among the rest of candidates.
 
-Our approach is evaluated on the challenging Similar Multi-Object Tracking (SMOT) dataset and it achieves an impressing precision improvement of the 10% with respect to the baseline. We present an extension to the SMOT dataset, the eSMOT, including more sequences with complex dynamic scenarios, where the performance of our approach is excellent, therefore we use its predictions to label the Ground Truth. 
+Our approach is evaluated on the challenging Similar Multi-Object Tracking (SMOT) dataset and it achieves a relevant precision improvement of the 10% with respect to the baseline. We present an extension to the SMOT dataset, the eSMOT, including more sequences with complex dynamic scenarios, where the performance of our approach is excellent, therefore we use its predictions to label the Ground Truth. 
 
 Although there is still room for enhancement mainly regarding the efficiency of the architecture, this work has served as a relevant proof of concept for the intuitions behind it and consequently, research in this direction will surely continue at the Robust Systems Laboratory.
 
