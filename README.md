@@ -10,13 +10,14 @@ To achieve this goal, we propose a unified framework that combines, in an online
 Our approach is tested on the challenging Similar Multi-Object Tracking Dataset and it achieves an impressing \hl{improvement of 5\%} with respect to the baseline. Although there is still room for improvement mainly regarding the efficiency of the approach, this work has served as a relevant proof of concept for the intuitions behind it and consequently, research in this direction will surely continue at the Robust Systems Laboratory.
 
 ## Single Object Tracking Examples
-Baseline in red and ours in green.
+<p>This is a <span class="redText">red</span> word in a sentence</p>
+Baseline in red and ours in green, sequences <i>football</i>, <i>hockey</i> and <i>soccer</i> from eSMOT dataset.
 
 <img src="/memory/gifs/football_both.gif" width="600" height="335"/>
 <img src="/memory/gifs/hockey_both.gif" width="600" height="335"/>
 <img src="/memory/gifs/soccer_both.gif" width="600" height="335"/>
 
-## Multiple Object Tracking Examples
-Baseline on the left and our approach on the right.
+## Multiple Object Tracking Example
+Baseline on the <b>left</b> and our approach on the  <b>left</b>, sequence  <i>acrobats</i> from SMOT dataset.
 
 <img src="/memory/gifs/acrobats_siam.gif" width="450" height="260"/> <img src="/memory/gifs/acrobats_ours.gif" width="450" height="260"/>
