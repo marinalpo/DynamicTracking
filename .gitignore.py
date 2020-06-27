@@ -1,0 +1,10 @@
+baseline/
+old/
+__pycache__/
+*.pyc
+.vscode/
+*.jpg
+*.jpeg
+*.png
+torchnew/
+*.npy
