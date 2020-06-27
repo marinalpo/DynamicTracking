@@ -19,4 +19,4 @@ Baseline in <b>red</b> and ours in <b>green</b>, sequences <i>football</i>, <i>h
 ## Multiple Object Tracking Example
 Baseline on the <b>left</b> and our approach on the  <b>right</b>, sequence  <i>acrobats</i> from SMOT dataset.
 
-<img src="/memory/gifs/acrobats_siam.gif" width="450" height="260"/> <img src="/memory/gifs/acrobats_ours.gif" width="450" height="260"/>
+<img src="/memory/gifs/acrobats_siam.gif" width="400" height="220"/> <img src="/memory/gifs/acrobats_ours.gif" width="400" height="220"/>
