@@ -8,15 +8,15 @@ Our approach is tested on the challenging Similar Multi-Object Tracking Dataset 
 
 # Single Object Tracking Examples
 Baseline in red and ours in green
-![GitHub Logo](./../memory/gifs/football_both.gif)
+![GitHub Logo](/memory/gifs/football_both.gif)
 
-![GitHub Logo](./../memory/gifs/hockey_both.gif)
+![GitHub Logo](/memory/gifs/hockey_both.gif)
 
-![GitHub Logo](./../memory/gifs/soccer_both.gif)
+![GitHub Logo](/memory/gifs/soccer_both.gif)
 
 # Multiple Object Tracking Examples
 Baseline
-![GitHub Logo](./../memory/gifs/acrobats_siam.gif)
+![GitHub Logo](/memory/gifs/acrobats_siam.gif)
 
 Ours
-![GitHub Logo](./../memory/gifs/acrobats_ours.gif)
+![GitHub Logo](/memory/gifs/acrobats_ours.gif)
