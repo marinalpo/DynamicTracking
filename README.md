@@ -12,11 +12,11 @@ Our approach is tested on the challenging Similar Multi-Object Tracking Dataset 
 ## Single Object Tracking Examples
 Baseline in <b>red</b> and ours in <b>green</b>, sequences <i>football</i>, <i>hockey</i> and <i>soccer</i> from eSMOT dataset.
 
-<img src="/memory/gifs/football_both.gif" width="600" height="335"/>
-<img src="/memory/gifs/hockey_both.gif" width="600" height="335"/>
-<img src="/memory/gifs/soccer_both.gif" width="600" height="335"/>
+<img src="/figures/gifs/football_both.gif" width="600" height="335"/>
+<img src="/figures/gifs/hockey_both.gif" width="600" height="335"/>
+<img src="/figures/gifs/soccer_both.gif" width="600" height="335"/>
 
 ## Multiple Object Tracking Example
 Baseline on the <b>left</b> and our approach on the  <b>right</b>, sequence  <i>acrobats</i> from SMOT dataset.
 
-<img src="/memory/gifs/acrobats_siam.gif" width="400" height="220"/> <img src="/memory/gifs/acrobats_ours.gif" width="400" height="220"/>
+<img src="/figures/gifs/acrobats_siam.gif" width="400" height="220"/> <img src="/figures/gifs/acrobats_ours.gif" width="400" height="220"/>
