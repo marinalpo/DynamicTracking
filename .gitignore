@@ -1,4 +1,7 @@
 /old/
+.idea/
+old/
+baseline/
 /baseline/
 __pycache__/
 *.pyc
