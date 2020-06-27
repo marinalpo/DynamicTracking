@@ -1,7 +1,8 @@
-old/
+/old/
+/baseline/
 __pycache__/
 *.pyc
-.idea/
+/.idea/
 *.jpg
 *.jpeg
 *.png
