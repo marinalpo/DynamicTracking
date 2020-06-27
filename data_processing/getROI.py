@@ -1,10 +1,9 @@
 import cv2
 
 frame_path = '/Users/marinaalonsopoal/Desktop/Tracking/Datasets/SMOT/acrobats/img/000037.jpg'
+frame_path = '/Users/marinaalonsopoal/Desktop/Tracking/Datasets/eSMOT/football/img/00055.jpeg'
 
 image = cv2.imread(frame_path)
-
-xleft, ytop, xright, ybottom = 435, 253, 483, 385
 
 # Display
 cv2.imshow("output", image)
@@ -12,7 +11,8 @@ cv2.imshow("output", image)
 fromCenter = False
 r = cv2.selectROI("Image", image, fromCenter)
 
-print('\nCoordinates:')
-print(r, '\n')
+xleft, ytop, xright, ybottom = r
+print('r:', r)
+
 
 cv2.destroyAllWindows()

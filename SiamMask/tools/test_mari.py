@@ -37,11 +37,12 @@ columns_names = ['FrameID',	'ObjectID',	'x_topleft',	'y_topleft',	'Width',	'Heig
 # Visualization Parameters
 draw_GT = True
 draw_proposal = True
-draw_candidates = True
-draw_pred = True
+draw_candidates = False
+draw_pred = False
 draw_mask = False
+draw_result = True
 
-correct_with_dynamics = True
+correct_with_dynamics = False
 filter_boxes = True
 eps = 1  # Noise variance
 metric = 0  # if 0: JBLD, if 1: JKL
@@ -50,9 +51,7 @@ slow = False  # If true: Slow(but Precise), if false: Fast
 norm = True  # If true: Norm, if false: MSE
 
 max_num_obj = 10  # Maximum number of objects being tracked
-T0 = 11  # System memory (best: 11)
 num_frames = 150  # 150 for Acrobats / 130 for juggling
-N = 100  # Maximum number of candidates returned by the tracking (15)
 dataset = 1  # 0: MOT, S1: SMOT, 2: Stanford
 sequence = 'acrobats'  # SMOT: 'acrobats' or 'juggling'
 video = 'video0'
@@ -64,14 +63,18 @@ img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_p
 
 # TODO: Si el volem nomes dun objecte
 single_object = False
-obj = 3
+obj = 5
 config = 'B'
-if config == 'A':  # 2: 96.67%
-    N, size_th, iou_thr = 50, 0.2, 0
-elif config == 'B':  # 4: 98.62%, 5: 99.33%
-    N, size_th, iou_thr = 75, 0.1, 0.01
-elif config == 'C':  # 3: 86.92%
-    N, size_th, iou_thr = 100, 0.5, 0.2
+if config == 'A':
+    T0, N, iou_thr = 8, 75, 0.01
+if config == 'B':
+    T0, N, iou_thr = 11, 50, 0.0
+elif config == 'C':
+    T0, N, iou_thr = 11, 75, 0.01
+
+if not correct_with_dynamics:
+    N = 1
+
 
 
 # Loads init file, deletes targets if there are more than max_num_obj in the requested frames
@@ -140,7 +143,7 @@ if __name__ == '__main__':
             im_init = im.copy()
             im_track = im.copy()
             tic = cv2.getTickCount()
-            cv2.putText(im, 'Approach 3', (10, 30), font, font_size * 0.75, (255, 255, 255), 2, cv2.LINE_AA)
+            # cv2.putText(im, 'Approach 3', (10, 30), font, font_size * 0.75, (255, 255, 255), 2, cv2.LINE_AA)
 
             # Get number of objects that are initialized in this frame
             init_frame = init[init.FrameID == f]
@@ -157,7 +160,7 @@ if __name__ == '__main__':
                     target_pos_dict[ob] = []
 
                 # x1, y1, x2, y2, x3, y3, x4, y4 = x + w, y + h, x, y + h, x, y, x + w, y
-                cx, cy = row['cx'], row['cy']
+                # cx, cy = row['cx'], row['cy']
                 target_pos = np.array([x + w / 2, y + h / 2])
                 target_sz = np.array([w, h])
 
@@ -211,9 +214,10 @@ if __name__ == '__main__':
 
                 # Convert candidate to centroids and size shape
                 location = np.int0(rboxes_cand[0][0].flatten()).reshape((-1, 1, 2))
+                loc_prop = location
                 this_poly = rboxes_cand[0][0]
                 poly_pos_siam, poly_sz_siam = get_aligned_bbox(rboxes_cand[0][0].flatten())
-                cv2.circle(im, (int(poly_pos_siam[0]), int(poly_pos_siam[1])), 3, col, 3)
+                # cv2.circle(im, (int(poly_pos_siam[0]), int(poly_pos_siam[1])), 3, col, 3)
 
                 if draw_proposal:
                     cv2.polylines(im, [location], True, col, 3)
@@ -231,7 +235,7 @@ if __name__ == '__main__':
                         rboxes_all = rboxes_cand
                         for box in range(len(rboxes_all)):
                             location_all = np.int0(rboxes_all[box][0].flatten()).reshape((-1, 1, 2))
-                            cv2.polylines(im, [location_all], True, (0, 0, 255), 1)
+                            # cv2.polylines(im, [location_all], True, (0, 0, 255), 1)
 
                         print('------------------------------------')
                         print('Trajectory not robust --> Prediction')
@@ -239,7 +243,7 @@ if __name__ == '__main__':
                         # cv2.circle(im, (int(pred_pos[0]), int(pred_pos[1])), 3, (0, 0, 255), 3)
 
                         if filter_boxes:  # Filter overlapping boxes
-                            rboxes, idxs_del = filter_bboxes_plus_2(rboxes_cand, last_poly,  size_th=size_th, iou_thr=iou_thr)
+                            rboxes, idxs_del = filter_bboxes_plus_2(rboxes_cand, last_poly, iou_thr=iou_thr)
                             bboxes = bboxes[0:4, np.ix_(idxs_del)].squeeze()
                             masks = list(compress(masks, idxs_del))
                             print('Filtered candidates:', N - sum(idxs_del))
@@ -296,8 +300,17 @@ if __name__ == '__main__':
                         state['target_sz'] = pred_sz
                         this_poly = rboxes[idx][0]
                         location = np.int0(rboxes[idx][0].flatten()).reshape((-1, 1, 2))
+
                         if draw_pred:
-                            cv2.polylines(im, [location], True, (255, 255, 0), 3)
+                            cv2.polylines(im, [location], True, col, 5)
+                            cv2.polylines(im, [loc_prop], True, col, 8)
+                        if draw_result:
+                            cv2.polylines(im, [location], True, col, 6)
+
+
+                    else:
+                        if draw_result:
+                            cv2.polylines(im, [loc_prop], True, col, 6)
 
                 value['last_poly'] = this_poly
                 value['state'] = state
@@ -327,8 +340,8 @@ if __name__ == '__main__':
                     h_gt = gt_sz[1]
                     x_tl_gt = cx_gt - w_gt / 2
                     y_tl_gt = cy_gt - h_gt / 2
-                    cv2.rectangle(im, (int(x_tl_gt), int(y_tl_gt)), (int(x_tl_gt + w_gt), int(y_tl_gt + h_gt)), col, 1)
-                    # cv2.circle(im, (int(x_tl_gt), int(y_tl_gt)), 3, col, 1)
+                    # cv2.rectangle(im, (int(x_tl_gt), int(y_tl_gt)), (int(x_tl_gt + w_gt), int(y_tl_gt + h_gt)), col, 1)
+                    cv2.circle(im, (int(cx_gt), int(cy_gt)), 5, col, 3)
 
 
             cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
@@ -384,8 +397,8 @@ if __name__ == '__main__':
         tin = tracker_dyn.t_init
         tfin = num_frames
         c_gt = c_gt[tin - 1:tfin + 1, :]
-        plot_jbld_eta_score_4(tracker_dyn, c_gt, obj, tin, tfin)
-        plot_gt_cand_pred_box(tracker_dyn, c_gt, obj, tin, tfin)
+        # plot_jbld_eta_score_4(tracker_dyn, c_gt, obj, tin, tfin)
+        # plot_gt_cand_pred_box(tracker_dyn, c_gt, obj, tin, tfin)
 
 
 

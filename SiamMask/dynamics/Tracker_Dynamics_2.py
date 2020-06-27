@@ -161,6 +161,7 @@ class TrackerDyn_2:
             data_root = data_root.view(1, len(data_root))
             # print('data root:', data_root)
             [uhat_root, eta_root, x, R] = fast_incremental_hstln_mo(data_root, self.eta_max_clas, self.slow)
+            # print('norm eta:', torch.norm(eta_root, 'fro'))
             # print('uhat_root:', uhat_root)
             # print('R:', R)
             # u_hat = (u_hat.numpy()).flatten()

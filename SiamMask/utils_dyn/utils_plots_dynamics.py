@@ -832,13 +832,11 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, tin, tfin):
         for j in range(2):
             ax[i, j].grid(axis='x', zorder=1, alpha=0.4)
 
-    fig.suptitle('Object:' + str(obj))
-
     # print('shape frames:', frames.shape)
     # print('shape pred', centr_pred[:, 0].shape)
     # print('shape corr', centr_corr[:, 0].shape)
 
-    ax[0, 0].set_title('Position Centroid x')
+    ax[0, 0].set_title('Coordinate x position')
 
     ax[0, 0].scatter(frames, centr_prop[:, 0], c='r', s=s_pred, edgecolors='k', alpha=0.6, label='Proposed',
                      zorder=3)
@@ -851,7 +849,7 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, tin, tfin):
     ax[0, 0].scatter(frames, c_gt[:, 0], c='r', s=s_gt, alpha=0.2, label='GT', zorder=3)
     ax[0, 0].legend()
 
-    ax[0, 1].set_title('Position Centroid y')
+    ax[0, 1].set_title('Coordinate y position')
     ax[0, 1].scatter(frames, centr_prop[:, 1], c='g', s=s_pred, edgecolors='k', alpha=0.6, label='Proposed',
                      zorder=3)
     ax[0, 1].scatter(frames, centr_pred[:, 1], c='y', s=s_pred, edgecolors='k', alpha=0.6, label='Predicted',
@@ -864,54 +862,50 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, tin, tfin):
 
     # NOTE: Plot JBLDS
     ax[1, 0].plot(frames, jbld[:, 0], c='r')
-    ax[1, 0].set_title('JBLD distance in Centroid x using T0:' + str(T0) + ' and Noise:' + str(eps))
+    ax[1, 0].set_title('Coordinate x JBLD distance for T0=' + str(T0) + ' and noise var=' + str(eps))
     ax[1, 0].set_ylim([0, max_jbld + max_jbld * 0.05])
     ax[1, 0].axhline(tracker.th_jbld, linestyle=':', color='k', alpha=0.5)
     ax[1, 0].axhline(tracker.th_jbld_max, linestyle=':', color='k', alpha=0.5)
 
     ax[1, 1].plot(frames, jbld[:, 1], c='g')
-    ax[1, 1].set_title('JBLD distance in Centroid y using T0:' + str(T0) + ' and Noise:' + str(eps))
+    ax[1, 1].set_title('Coordinate y JBLD distance for T0=' + str(T0) + ' and noise var=' + str(eps))
     ax[1, 1].set_ylim([0, max_jbld + max_jbld * 0.05])
     ax[1, 1].axhline(tracker.th_jbld, linestyle=':', color='k', alpha=0.5)
     ax[1, 1].axhline(tracker.th_jbld_max, linestyle=':', color='k', alpha=0.5)
 
     # NOTE: Plot ETAS
     ax[2, 0].plot(frames, etas[:, 0], c='r')
-    ax[2, 0].set_title(slow_name[slow] + ' Implementation of ' + norm_name[norm] + ' of Eta in Centroid x '
-                                                                                   'using T0:' + str(
-        T0) + ' and R:' + str(R))
+    ax[2, 0].set_title('Coordinate x eta norm difference')
     ax[2, 0].set_ylim([0, max_etas + max_etas * 0.05])
     ax[2, 0].axhline(tracker.th_eta, linestyle=':', color='k', alpha=0.5)
 
     ax[2, 1].plot(frames, etas[:, 1], c='g')
-    ax[2, 1].set_title(slow_name[slow] + ' Implementation of ' + norm_name[norm] + ' of Eta in Centroid y '
-                                                                                   'using T0:' + str(
-        T0) + ' and R:' + str(R))
+    ax[2, 1].set_title('Coordinate y eta norm difference')
     ax[2, 1].set_ylim([0, max_etas + max_etas * 0.05])
     ax[2, 1].axhline(tracker.th_eta, linestyle=':', color='k', alpha=0.5)
 
 
-    ax[3, 0].bar(frames, Rs[:, 0], color='r', label='Class. (eta_max='+str(tracker.eta_max_clas)+')')
-    ax[3, 0].bar(frames, Rs_pred[:, 0], color='k',  alpha=0.6, label='Pred. (eta_max='+str(tracker.eta_max_pred)+')')
-    ax[3, 0].set_title('R optim for coord. x')
+    ax[3, 0].bar(frames, Rs[:, 0], color='r', label='Class. (eta='+str(tracker.eta_max_clas)+')')
+    ax[3, 0].bar(frames, Rs_pred[:, 0], color='k',  alpha=0.6, label='Pred. (eta='+str(tracker.eta_max_pred)+')')
+    ax[3, 0].set_title('Coordinate x optimal n')
     ax[3, 0].legend()
 
-    ax[3, 1].bar(frames, Rs[:, 1], color='g', label='Class. (eta_max='+str(tracker.eta_max_clas)+')')
-    ax[3, 1].bar(frames, Rs_pred[:, 1], color='k', alpha=0.6, label='Pred. (eta_max=' + str(tracker.eta_max_pred) + ')')
-    ax[3, 1].set_title('R optim for coord. y')
+    ax[3, 1].bar(frames, Rs[:, 1], color='g', label='Class. (eta='+str(tracker.eta_max_clas)+')')
+    ax[3, 1].bar(frames, Rs_pred[:, 1], color='k', alpha=0.6, label='Pred. (eta=' + str(tracker.eta_max_pred) + ')')
+    ax[3, 1].set_title('Coordinate y optimal n')
     ax[3, 1].bar(frames, Rs_pred[:, 1], color='k')
     ax[3, 1].legend()
 
 
     # NOTE: Plot score
     ax[4, 0].plot(frames, scores, c='k')
-    ax[4, 0].set_title('Appearance-based tracker score (confidence)')
+    ax[4, 0].set_title('Appearance-based tracker score')
     ax[4, 0].axhline(tracker.th_score, linestyle=':', color='k', alpha=0.5)
     ax[4, 0].axhline(tracker.th_score_min, linestyle=':', color='k', alpha=0.5)
     ax[4, 0].set_xlabel('frame')
 
     ax[4, 1].plot(frames, scores, c='k')
-    ax[4, 1].set_title('Appearance-based tracker score (confidence)')
+    ax[4, 1].set_title('Appearance-based tracker score')
     ax[4, 1].axhline(tracker.th_score, linestyle=':', color='k', alpha=0.5)
     ax[4, 1].axhline(tracker.th_score_min, linestyle=':', color='k', alpha=0.5)
     ax[4, 1].set_xlabel('frame')
@@ -929,7 +923,7 @@ def plot_jbld_eta_score_4(tracker, c_gt, obj, tin, tfin):
                     ax[i, d].axvline(f+tin, color=(1, 0.8, 0), alpha=a, zorder=1)
 
     plt.savefig('/data/results/plot1.png')
-    # plt.show()
+    plt.show()
 
 
 def plot_gt_cand_pred_box(tracker, c_gt, obj, tin, tfin):
@@ -959,17 +953,17 @@ def plot_gt_cand_pred_box(tracker, c_gt, obj, tin, tfin):
     T0 = tracker.T0
     R = 4
 
-    fig, ax = plt.subplots(2, 1)
+    fig, ax = plt.subplots(1, 2)
     plt.tight_layout()
 
     ax[0].grid(axis='x', zorder=1, alpha=0.4)
     ax[1].grid(axis='x', zorder=1, alpha=0.4)
 
-    fig.suptitle('Object:' + str(obj))
+    # fig.suptitle('Object:' + str(obj))
     # print('shape frames:', frames.shape)
     # print(centr_corr[:, 0].shape)
 
-    ax[0].set_title('Position Centroid x')
+    ax[0].set_title('Coordinate x centroid position')
     ax[0].scatter(frames, centr_prop[:, 0], c='r', s=s_pred, edgecolors='k', alpha=0.6, label='Proposed',
                      zorder=3)
     ax[0].scatter(frames, centr_pred[:, 0], c='y', s=s_pred, edgecolors='k', alpha=0.6, label='Predicted',
@@ -979,7 +973,7 @@ def plot_gt_cand_pred_box(tracker, c_gt, obj, tin, tfin):
     ax[0].scatter(frames, c_gt[:, 0], c='r', s=s_gt, alpha=0.2, label='GT', zorder=3)
     ax[0].legend()
 
-    ax[1].set_title('Position Centroid y')
+    ax[1].set_title('Coordinate y centroid position')
     ax[1].scatter(frames, centr_prop[:, 1], c='g', s=s_pred, edgecolors='k', alpha=0.6, label='Proposed',
                      zorder=3)
     ax[1].scatter(frames, centr_pred[:, 1], c='y', s=s_pred, edgecolors='k', alpha=0.6, label='Predicted',
@@ -998,4 +992,4 @@ def plot_gt_cand_pred_box(tracker, c_gt, obj, tin, tfin):
                 ax[d].axvline(f+tin, color=(1, 0.8, 0), alpha=0.7, zorder=1)
 
     plt.savefig('/data/results/plot2.png')
-    # plt.show()
+    plt.show()

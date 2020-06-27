@@ -309,6 +309,12 @@ def get_paths(dataset, sequence, video='video0'):
         init_path = '/data/stanford-campus/annotations/' + sequence + '/' + video + '/init.txt'
         init_path = '/data/stanford-campus/annotations/' + sequence + '/' + video + '/gt.txt'
 
+    elif dataset == 3:  # eSMOT
+        dataset = 'eSMOT'
+        img_path = '/data/eSMOT/' + sequence + '/img/'
+        init_path = '/data/eSMOT/' + sequence + '/gt/init.txt'
+        gt_path = '/data/eSMOT/' + sequence + '/gt/gt.txt'
+
     results_path = '/data/results/'
     centroids_path = '/data/Marina/centroids/centroids_' + dataset + '_' + sequence + '.obj'
     locations_path = '/data/Marina/centroids/locations_' + dataset + '_' + sequence + '.obj'
