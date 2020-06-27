@@ -9,7 +9,7 @@ from itertools import compress
 from tools.test_multi import *
 from custom import Custom
 from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
-from dynamics.Tracker_Dynamics_2 import TrackerDyn_2
+from dynamics.DynamicsModule import Dynamics_Module
 from utils_dyn.utils_plots_dynamics import *
 import warnings
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
@@ -166,7 +166,7 @@ if __name__ == '__main__':
 
 
                 # tracker_dyn = TrackerDyn_2(T0=T0, t_init=f, eta_max_pred=20, both=False)
-                tracker_dyn = TrackerDyn_2(T0=T0, t_init=f)
+                tracker_dyn = Dynamics_Module(T0=T0, t_init=f)
                 c, pred_pos, pred_ratio = tracker_dyn.update(target_pos, target_sz, 1)
 
                 nested_obj = {'target_pos': target_pos, 'target_sz': np.array([w, h]),

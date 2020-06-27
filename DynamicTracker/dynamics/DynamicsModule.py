@@ -17,7 +17,7 @@ from utils_dyn.utils_dynamics import *
 # from SiamMask.utils_dyn.utils_torch import *
 
 
-class TrackerDyn_2:
+class Dynamics_Module:
 
     def __init__(self, T0, t_init=1, eta_max_pred=10, both=True):
 

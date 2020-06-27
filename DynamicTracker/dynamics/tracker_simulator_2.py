@@ -14,8 +14,8 @@ import cv2
 from scipy.io import savemat
 
 # TODO: When debugging
-from SiamMask.utils_dyn.utils_plots_dynamics import *
-from SiamMask.dynamics.Tracker_Dynamics_2 import TrackerDyn_2
+from DynamicTracker.utils_dyn.utils_plots_dynamics import *
+from DynamicTracker.dynamics.Tracker_Dynamics_2 import TrackerDyn_2
 
 # TODO: Else
 # from utils_dyn.utils_plots_dynamics import *
