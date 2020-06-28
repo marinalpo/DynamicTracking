@@ -42,7 +42,7 @@ draw_pred = True
 draw_mask = False
 draw_result = True
 
-correct_with_dynamics = False
+correct_with_dynamics = True
 
 filter_boxes = True
 eps = 1  # Noise variance
@@ -52,9 +52,9 @@ slow = False  # If true: Slow(but Precise), if false: Fast
 norm = True  # If true: Norm, if false: MSE
 
 max_num_obj = 10  # Maximum number of objects being tracked
-num_frames = 89  # 150 for Acrobats / 130 for juggling
+num_frames = 100  # 150 for Acrobats / 130 for juggling
 dataset = 3  # 0: MOT, S1: SMOT, 2: Stanford, 3: eSMOT
-sequence = 'football'  # eSMOT: 'hockey' or 'football' or 'soccer'
+sequence = 'bolt1'  # eSMOT: 'hockey' or 'football' or 'soccer' or 'bolt1'
 video = 'video0'
 
 print('\nDataset:', dataset_name[dataset], ' Sequence:', sequence, ' Number of frames:', num_frames)

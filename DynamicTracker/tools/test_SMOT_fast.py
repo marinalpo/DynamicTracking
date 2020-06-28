@@ -9,7 +9,7 @@ from itertools import compress
 from tools.test_multi import *
 from custom import Custom
 from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
-from dynamics.Tracker_Dynamics_2 import TrackerDyn_2
+from dynamics.DynamicsModule import Dynamics_Module
 from utils_dyn.utils_plots_dynamics import *
 import warnings
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
@@ -40,17 +40,17 @@ draw_candidates = False
 draw_pred = False
 draw_mask = False
 
-correct_with_dynamics = True
+correct_with_dynamics = False
 filter_boxes = True
 eps = 1  # Noise variance
 metric = 0  # if 0: JBLD, if 1: JKL
 W = 3  # Smoothing window length
 slow = False  # If true: Slow(but Precise), if false: Fast
 norm = True  # If true: Norm, if false: MSE
-num_frames = 150  # 1285 crowd # 150 acrobats / 130 juggling/ 600 slalom / 581 seagulls/
+num_frames = 130  # 1285 crowd # 150 acrobats / 130 juggling/ 600 slalom / 581 seagulls/
 size_th = 0.2
 dataset = 1  # 0: MOT, 1: SMOT, 2: Stanford
-sequence = 'acrobats'  # SMOT: 'acrobats' or 'juggling'
+sequence = 'juggling'  # SMOT: 'acrobats' or 'juggling'
 video = 'video1'
 print('\nDataset:', dataset_name[dataset], ' Sequence:', sequence, ' Number of frames:', num_frames)
 
@@ -63,7 +63,7 @@ obj = 5
 config = 'B'
 if config == 'A':
     T0, N, iou_thr = 8, 75, 0.01
-if config == 'B':
+if config == 'B':  # for testing all SMOT multiobject
     T0, N, iou_thr = 11, 50, 0.0
 elif config == 'C':
     T0, N, iou_thr = 11, 75, 0.01
@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
 
                 # tracker_dyn = TrackerDyn_2(T0=T0, t_init=f, eta_max_pred=20, both=False)
-                tracker_dyn = TrackerDyn_2(T0=T0, t_init=f)
+                tracker_dyn = Dynamics_Module(T0=T0, t_init=f)
                 c, pred_pos, pred_ratio = tracker_dyn.update(target_pos, target_sz, 1)
 
                 nested_obj = {'target_pos': target_pos, 'target_sz': np.array([w, h]),

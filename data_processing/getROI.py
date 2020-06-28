@@ -1,7 +1,7 @@
 import cv2
 
-frame_path = '/Users/marinaalonsopoal/Desktop/Tracking/Datasets/SMOT/acrobats/img/000037.jpg'
-frame_path = '/Users/marinaalonsopoal/Desktop/Tracking/Datasets/eSMOT/football/img/00055.jpeg'
+# frame_path = '/Users/marinaalonsopoal/Desktop/Tracking/Datasets/SMOT/juggling/img/000022.jpg'
+frame_path = '/Users/marinaalonsopoal/Desktop/Tracking/Datasets/eSMOT/bolt1/img/00000024.jpg'
 
 image = cv2.imread(frame_path)
 

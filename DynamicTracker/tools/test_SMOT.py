@@ -9,7 +9,7 @@ from itertools import compress
 from tools.test_multi import *
 from custom import Custom
 from utils.bbox_helper import get_axis_aligned_bbox, cxy_wh_2_rect
-from dynamics.Tracker_Dynamics_2 import TrackerDyn_2
+from dynamics.DynamicsModule import Dynamics_Module
 from utils_dyn.utils_plots_dynamics import *
 import warnings
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
@@ -30,30 +30,31 @@ args = parser.parse_args()
 font = cv2.FONT_HERSHEY_SIMPLEX
 font_size = 1
 columns_location = ['FrameID', 'ObjectID', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4']
-dataset_name = ['MOT', 'SMOT', 'Stanford']
+dataset_name = ['MOT', 'SMOT', 'Stanford', 'eSMOT']
 columns_names = ['FrameID',	'ObjectID',	'x_topleft',	'y_topleft',	'Width',	'Height',	'isActive',	'isOccluded', 'cx', 'cy']
 
 
 # Visualization Parameters
-draw_GT = True
-draw_proposal = True
+draw_GT = False
+draw_proposal = False # to draw SiamMask
 draw_candidates = False
 draw_pred = False
-draw_mask = False
-draw_result = True
+draw_mask = True
+draw_result = True  # draw when correcting
 
-correct_with_dynamics = False
+correct_with_dynamics = True
 filter_boxes = True
 eps = 1  # Noise variance
 metric = 0  # if 0: JBLD, if 1: JKL
 W = 3  # Smoothing window length
 slow = False  # If true: Slow(but Precise), if false: Fast
 norm = True  # If true: Norm, if false: MSE
+line_w = 4
 
 max_num_obj = 10  # Maximum number of objects being tracked
-num_frames = 150  # 150 for Acrobats / 130 for juggling
-dataset = 1  # 0: MOT, S1: SMOT, 2: Stanford
-sequence = 'acrobats'  # SMOT: 'acrobats' or 'juggling'
+num_frames = 200  # 150 for Acrobats / 130 for juggling
+dataset = 3  # 0: MOT, S1: SMOT, 2: Stanford
+sequence = 'bolt1'  # SMOT: 'acrobats' or 'juggling'
 video = 'video0'
 
 print('\nDataset:', dataset_name[dataset], ' Sequence:', sequence, ' Number of frames:', num_frames)
@@ -63,14 +64,16 @@ img_path, init_path, results_path, centroids_path, locations_path, dataset, gt_p
 
 # TODO: Si el volem nomes dun objecte
 single_object = False
-obj = 5
-config = 'B'
+obj = 3
+config = 'A'
 if config == 'A':
     T0, N, iou_thr = 8, 75, 0.01
-if config == 'B':
+if config == 'B':  # for testing all SMOT multiobject
     T0, N, iou_thr = 11, 50, 0.0
 elif config == 'C':
     T0, N, iou_thr = 11, 75, 0.01
+elif config == 'X':
+    T0, N, iou_thr, filter_boxes = 9, 65, 0.01, True
 
 if not correct_with_dynamics:
     N = 1
@@ -172,7 +175,7 @@ if __name__ == '__main__':
 
 
                 # tracker_dyn = TrackerDyn_2(T0=T0, t_init=f, eta_max_pred=20, both=False)
-                tracker_dyn = TrackerDyn_2(T0=T0, t_init=f)
+                tracker_dyn = Dynamics_Module(T0=T0, t_init=f)
                 c, pred_pos, pred_ratio = tracker_dyn.update(target_pos, target_sz, 1)
 
                 nested_obj = {'target_pos': target_pos, 'target_sz': np.array([w, h]),
@@ -183,8 +186,8 @@ if __name__ == '__main__':
 
                 nested_obj['state'] = state
                 objects[ob] = nested_obj
-                cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (255, 255, 0), 5)
-                cv2.putText(im, 'init obj:'+str(ob), (int(x), int(y) - 7), font, font_size * 0.75, (255, 255, 0), 2, cv2.LINE_AA)
+                cv2.rectangle(im, (int(x), int(y)), (int(x + w), int(y + h)), (255, 255, 0), line_w)
+                cv2.putText(im, 'init', (int(x), int(y) - 7), font, 0.6, (255, 255, 0), 2, cv2.LINE_AA)
 
             for key, value in objects.items():
                 if value['init_frame'] == f:
@@ -244,7 +247,11 @@ if __name__ == '__main__':
 
                         if filter_boxes:  # Filter overlapping boxes
                             rboxes, idxs_del = filter_bboxes_plus_2(rboxes_cand, last_poly, iou_thr=iou_thr)
-                            bboxes = bboxes[0:4, np.ix_(idxs_del)].squeeze()
+                            if idxs_del[0] == 1:
+                                print('guanyador')
+                                bboxes = bboxes[0:4, 0].squeeze()
+                            else:
+                                bboxes = bboxes[0:4, np.ix_(idxs_del)].squeeze()
                             masks = list(compress(masks, idxs_del))
                             print('Filtered candidates:', N - sum(idxs_del))
 
@@ -253,6 +260,7 @@ if __name__ == '__main__':
                             del rboxes_cand[0]
                             del masks[0]
                             bboxes = bboxes[:, 1:]
+
                             # print('bboxes cand:\n', bboxes)
 
                             rboxes = rboxes_cand
@@ -268,6 +276,7 @@ if __name__ == '__main__':
 
                             if draw_candidates:
                                 cv2.polylines(im, [location], True, (255, 255, 255), 1)
+                                # cv2.circle(im, (int(poly_pos[0]), int(poly_pos[1])), 3, (255, 255, 255), 2)
 
 
                         pred_pos, pred_sz, idx = get_best_bbox(poly_cand, pred_pos, pred_ratio)
@@ -302,15 +311,15 @@ if __name__ == '__main__':
                         location = np.int0(rboxes[idx][0].flatten()).reshape((-1, 1, 2))
 
                         if draw_pred:
-                            cv2.polylines(im, [location], True, col, 5)
-                            cv2.polylines(im, [loc_prop], True, col, 8)
+                            cv2.polylines(im, [location], True, (0, 255, 255), line_w)
+                            cv2.polylines(im, [loc_prop], True, (0, 255, 255), line_w)
                         if draw_result:
-                            cv2.polylines(im, [location], True, col, 6)
+                            cv2.polylines(im, [location], True, col, line_w)
 
 
                     else:
                         if draw_result:
-                            cv2.polylines(im, [loc_prop], True, col, 6)
+                            cv2.polylines(im, [loc_prop], True, col, line_w)
 
                 value['last_poly'] = this_poly
                 value['state'] = state
@@ -340,8 +349,8 @@ if __name__ == '__main__':
                     h_gt = gt_sz[1]
                     x_tl_gt = cx_gt - w_gt / 2
                     y_tl_gt = cy_gt - h_gt / 2
-                    # cv2.rectangle(im, (int(x_tl_gt), int(y_tl_gt)), (int(x_tl_gt + w_gt), int(y_tl_gt + h_gt)), col, 1)
-                    cv2.circle(im, (int(cx_gt), int(cy_gt)), 5, col, 3)
+                    cv2.rectangle(im, (int(x_tl_gt), int(y_tl_gt)), (int(x_tl_gt + w_gt), int(y_tl_gt + h_gt)), col, 1)
+                    # cv2.circle(im, (int(cx_gt), int(cy_gt)), 5, col, 3)
 
 
             cv2.imwrite(results_path + str(f).zfill(6) + '.jpg', im)
